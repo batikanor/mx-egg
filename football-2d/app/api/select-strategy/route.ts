@@ -65,7 +65,7 @@ Respond in JSON format:
   "reasoning": "brief explanation of why you made this choice (2-3 sentences)"
 }`
       },
-      // Add all FOV screenshots (up to 10, most recent first)
+      // Add all FOV screenshots (up to 5, most recent first)
       ...playerKnowledge.fovScreenshots.slice().reverse().map((screenshot) => ({
         type: 'image_url' as const,
         image_url: {

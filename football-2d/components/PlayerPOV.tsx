@@ -683,8 +683,8 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
             {/* FOV Screenshots */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-zinc-400">Recent FOV Snapshots (last 10):</span>
-                <span className="text-xs text-zinc-500">{knowledge.fovScreenshots.length}/10</span>
+                <span className="text-xs text-zinc-400">Recent FOV Snapshots (last 5):</span>
+                <span className="text-xs text-zinc-500">{knowledge.fovScreenshots.length}/5</span>
               </div>
               <div className="grid grid-cols-5 gap-2">
                 {knowledge.fovScreenshots.map((screenshot, idx) => (
@@ -695,7 +695,7 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
                     </div>
                   </div>
                 ))}
-                {Array.from({ length: 10 - knowledge.fovScreenshots.length }).map((_, idx) => (
+                {Array.from({ length: 5 - knowledge.fovScreenshots.length }).map((_, idx) => (
                   <div key={`empty-${idx}`} className="aspect-video rounded border border-zinc-700 border-dashed bg-zinc-900/30 flex items-center justify-center">
                     <span className="text-[10px] text-zinc-600">—</span>
                   </div>

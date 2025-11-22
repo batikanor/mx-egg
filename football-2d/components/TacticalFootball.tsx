@@ -145,7 +145,7 @@ interface PlayerKnowledge {
   playerId: string;
   team: 'red' | 'blue';
   currentScore: { red: number; blue: number };
-  fovScreenshots: string[]; // Array of base64 image data URLs (last 10)
+  fovScreenshots: string[]; // Array of base64 image data URLs (last 5)
 
   // Strategic information
   myCurrentStrategy: string;
@@ -835,8 +835,8 @@ export default function TacticalFootball() {
             const knowledge = updated.get(playerId);
             if (knowledge) {
               const newScreenshots = [...knowledge.fovScreenshots, screenshot];
-              // Keep only last 10
-              if (newScreenshots.length > 10) {
+              // Keep only last 5
+              if (newScreenshots.length > 5) {
                 newScreenshots.shift();
               }
               updated.set(playerId, {

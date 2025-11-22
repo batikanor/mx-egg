@@ -1,6 +1,6 @@
 # AI Strategy Selection Setup
 
-This game uses **OpenRouter** with **Grok-2-Vision-1212** for AI-powered strategy selection. Each player analyzes their FOV screenshots, trajectory predictions, and game state every 5 seconds to decide their optimal strategy.
+This game uses **OpenRouter** with **Grok 4.1 Fast (Non-Reasoning)** for AI-powered strategy selection. Each player analyzes their FOV screenshots, trajectory predictions, and game state every 5 seconds to decide their optimal strategy.
 
 ## Setup Instructions
 
@@ -41,7 +41,7 @@ npm run dev
 
 - **Every 5 seconds**, a random player is selected for strategy evaluation
 - The AI receives:
-  - Player's most recent FOV screenshot
+  - Player's last 5 FOV screenshots (most recent first)
   - Current game score and team
   - Ball trajectory and landing position
   - Interception analysis (who can reach the ball and when)
@@ -55,10 +55,11 @@ npm run dev
 
 ## Model Information
 
-- **Model**: `x-ai/grok-2-vision-1212`
+- **Model**: `x-ai/grok-4-1-fast-non-reasoning`
 - **Capabilities**: Multimodal (text + images)
-- **Context**: Analyzes FOV screenshots with game state
+- **Context**: Analyzes last 5 FOV screenshots with game state
 - **Output**: JSON with strategy selection and reasoning
+- **Speed**: Optimized for instant responses without extended reasoning
 
 ## Viewing AI Thoughts
 
