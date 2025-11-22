@@ -682,29 +682,34 @@ export default function TacticalFootball() {
 
   // Handle canvas ready for background capture
   const handleBackgroundCanvasReady = useCallback((playerId: string, canvas: HTMLCanvasElement) => {
-    // Capture screenshot immediately when canvas is ready
-    try {
-      const screenshot = canvas.toDataURL('image/jpeg', 0.7);
+    // Give the canvas a moment to render before capturing
+    setTimeout(() => {
+      try {
+        const screenshot = canvas.toDataURL('image/jpeg', 0.7);
 
-      setPlayerKnowledge(prev => {
-        const updated = new Map(prev);
-        const knowledge = updated.get(playerId);
-        if (knowledge) {
-          const newScreenshots = [...knowledge.fovScreenshots, screenshot];
-          // Keep only last 10
-          if (newScreenshots.length > 10) {
-            newScreenshots.shift();
-          }
-          updated.set(playerId, {
-            ...knowledge,
-            fovScreenshots: newScreenshots
+        // Check if it's not a blank canvas (all black/white)
+        if (screenshot && screenshot.length > 1000) {
+          setPlayerKnowledge(prev => {
+            const updated = new Map(prev);
+            const knowledge = updated.get(playerId);
+            if (knowledge) {
+              const newScreenshots = [...knowledge.fovScreenshots, screenshot];
+              // Keep only last 10
+              if (newScreenshots.length > 10) {
+                newScreenshots.shift();
+              }
+              updated.set(playerId, {
+                ...knowledge,
+                fovScreenshots: newScreenshots
+              });
+            }
+            return updated;
           });
         }
-        return updated;
-      });
-    } catch (error) {
-      console.error(`Failed to capture screenshot for ${playerId}:`, error);
-    }
+      } catch (error) {
+        console.error(`Failed to capture screenshot for ${playerId}:`, error);
+      }
+    }, 100); // Wait 100ms for canvas to render
   }, []);
 
   // Rotate through all players for background POV capture
@@ -804,14 +809,14 @@ export default function TacticalFootball() {
         selectedPlayer={selectedPlayer}
       />
 
-      {/* Background POV Capture (hidden) */}
+      {/* Background POV Capture (visually hidden but still rendered) */}
       {backgroundCapturePlayer && (() => {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === backgroundCapturePlayer);
         const isRed = backgroundCapturePlayer.startsWith('r');
         const knowledge = playerKnowledge.get(backgroundCapturePlayer);
         return player && knowledge ? (
-          <div className="hidden">
+          <div style={{ position: 'absolute', left: '-9999px', width: '320px', height: '180px', pointerEvents: 'none' }}>
             <PlayerPOV
               player={player}
               redTeam={renderRed}
