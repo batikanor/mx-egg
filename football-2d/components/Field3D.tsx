@@ -50,6 +50,61 @@ const to3D = (x: number, y: number, z: number = 0) => {
   ] as [number, number, number];
 };
 
+// Stadium features component
+const Stadium = () => {
+  return (
+    <group>
+      {/* Stadium walls/stands - all four sides */}
+      <mesh position={[-60, 8, 0]} receiveShadow castShadow>
+        <boxGeometry args={[4, 16, 80]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+      <mesh position={[60, 8, 0]} receiveShadow castShadow>
+        <boxGeometry args={[4, 16, 80]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 8, -40]} receiveShadow castShadow>
+        <boxGeometry args={[120, 16, 4]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 8, 40]} receiveShadow castShadow>
+        <boxGeometry args={[120, 16, 4]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+
+      {/* Floodlights */}
+      {[
+        [-55, 20, -35],
+        [-55, 20, 35],
+        [55, 20, -35],
+        [55, 20, 35],
+      ].map((pos, idx) => (
+        <group key={idx} position={pos as [number, number, number]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.3, 0.3, 12, 8]} />
+            <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
+          </mesh>
+          <pointLight position={[0, 2, 0]} intensity={300} distance={60} color="#ffffff" />
+        </group>
+      ))}
+
+      {/* Advertising boards */}
+      {[-52, 52].map((x, idx) => (
+        <mesh key={`ad-lr-${idx}`} position={[x, 1, 0]} rotation={[0, idx === 0 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+          <planeGeometry args={[60, 2]} />
+          <meshStandardMaterial color="#0066cc" roughness={0.6} />
+        </mesh>
+      ))}
+      {[-32, 32].map((z, idx) => (
+        <mesh key={`ad-tb-${idx}`} position={[0, 1, z]} rotation={[0, idx === 0 ? Math.PI : 0, 0]}>
+          <planeGeometry args={[100, 2]} />
+          <meshStandardMaterial color="#cc0000" roughness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 // 3D Player Component
 const Player3D = ({
   player,
@@ -150,31 +205,67 @@ const Ball3D = ({ ball }: { ball: Ball }) => {
 // Field markings
 const FieldMarkings = () => {
   return (
-    <group>
-      {/* Center circle */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <ringGeometry args={[6, 6.2, 64]} />
-        <meshBasicMaterial color="#ffffff" opacity={0.8} transparent />
+    <group position={[0, 0.02, 0]}>
+      {/* Center line */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.2, FIELD_HEIGHT / 10]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
       </mesh>
 
-      {/* Center line */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[0.2, FIELD_HEIGHT / 10]} />
-        <meshBasicMaterial color="#ffffff" opacity={0.8} transparent />
+      {/* Center circle */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[6, 6.2, 64]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+      </mesh>
+
+      {/* Center spot */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.2, 32]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
       </mesh>
 
       {/* Penalty boxes */}
-      {/* Left penalty box */}
-      <lineSegments position={[-FIELD_WIDTH / 20, 0.01, 0]}>
-        <edgesGeometry args={[new THREE.BoxGeometry(13, 0, 26)]} />
-        <lineBasicMaterial color="#ffffff" opacity={0.8} transparent linewidth={2} />
-      </lineSegments>
+      {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => (
+        <group key={idx}>
+          {/* Penalty box outline */}
+          <lineSegments position={[x, 0, 0]}>
+            <edgesGeometry args={[new THREE.BoxGeometry(13, 0, 26)]} />
+            <lineBasicMaterial color="#ffffff" linewidth={2} />
+          </lineSegments>
+          {/* Goal box */}
+          <lineSegments position={[x, 0, 0]}>
+            <edgesGeometry args={[new THREE.BoxGeometry(5.5, 0, 11)]} />
+            <lineBasicMaterial color="#ffffff" linewidth={2} />
+          </lineSegments>
+          {/* Penalty spot */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x + (idx === 0 ? 6.5 : -6.5), 0, 0]}>
+            <circleGeometry args={[0.2, 32]} />
+            <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+          </mesh>
+          {/* Penalty arc */}
+          <mesh rotation={[-Math.PI / 2, 0, idx === 0 ? 0 : Math.PI]} position={[x + (idx === 0 ? 6.5 : -6.5), 0, 0]}>
+            <ringGeometry args={[9.15, 9.35, 32, 1, Math.PI * 0.37, Math.PI * 0.26]} />
+            <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+          </mesh>
+        </group>
+      ))}
 
-      {/* Right penalty box */}
-      <lineSegments position={[FIELD_WIDTH / 20, 0.01, 0]}>
-        <edgesGeometry args={[new THREE.BoxGeometry(13, 0, 26)]} />
-        <lineBasicMaterial color="#ffffff" opacity={0.8} transparent linewidth={2} />
-      </lineSegments>
+      {/* Corner arcs */}
+      {[
+        [-FIELD_WIDTH / 20, -FIELD_HEIGHT / 20],
+        [-FIELD_WIDTH / 20, FIELD_HEIGHT / 20],
+        [FIELD_WIDTH / 20, -FIELD_HEIGHT / 20],
+        [FIELD_WIDTH / 20, FIELD_HEIGHT / 20],
+      ].map((pos, idx) => (
+        <mesh
+          key={idx}
+          rotation={[-Math.PI / 2, 0, idx * Math.PI / 2]}
+          position={[pos[0], 0, pos[1]]}
+        >
+          <ringGeometry args={[1, 1.2, 16, 1, 0, Math.PI / 2]} />
+          <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+        </mesh>
+      ))}
     </group>
   );
 };
@@ -222,8 +313,8 @@ const Scene = ({ redTeam, blueTeam, ball, lockedPlayers }: Field3DProps) => {
       {/* Lighting */}
       <ambientLight intensity={0.5} />
       <directionalLight
-        position={[20, 30, 20]}
-        intensity={1}
+        position={[20, 40, 20]}
+        intensity={1.2}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -233,7 +324,10 @@ const Scene = ({ redTeam, blueTeam, ball, lockedPlayers }: Field3DProps) => {
         shadow-camera-top={60}
         shadow-camera-bottom={-60}
       />
-      <hemisphereLight intensity={0.3} groundColor="#555555" />
+      <hemisphereLight intensity={0.4} groundColor="#0a3a2a" />
+
+      {/* Stadium features */}
+      <Stadium />
 
       {/* Field */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>

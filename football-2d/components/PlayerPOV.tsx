@@ -1,6 +1,7 @@
 'use client';
 
-import { Canvas } from '@react-three/fiber';
+import { useRef, useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -75,32 +76,183 @@ const SimpleBall3D = ({ ball }: { ball: Ball }) => {
   );
 };
 
-// POV Scene
-const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) => {
-  const [px, py, pz] = to3D(player.x, player.y, 1.8); // Slightly above eye level for better view
+// Camera controller component
+const CameraController = ({ player, ball }: { player: Player; ball: Ball }) => {
+  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
 
-  // Calculate look direction (towards the ball)
-  const [bx, by, bz] = to3D(ball.x, ball.y, 0.4);
+  useFrame(() => {
+    if (cameraRef.current) {
+      const [px, py, pz] = to3D(player.x, player.y, 1.8);
+      const [bx, by, bz] = to3D(ball.x, ball.y, 0.4);
+
+      // Update camera position
+      cameraRef.current.position.set(px, py, pz);
+
+      // Look at the ball
+      cameraRef.current.lookAt(bx, by, bz);
+    }
+  });
+
+  const [px, py, pz] = to3D(player.x, player.y, 1.8);
 
   return (
-    <>
-      {/* Camera positioned at player's location, looking towards ball */}
-      <PerspectiveCamera
-        makeDefault
-        position={[px, py, pz]}
-        fov={75}
-      />
+    <PerspectiveCamera
+      ref={cameraRef}
+      makeDefault
+      position={[px, py, pz]}
+      fov={90}
+    />
+  );
+};
 
-      {/* Auto-rotate camera to look at ball */}
+// Stadium features component
+const Stadium = () => {
+  return (
+    <group>
+      {/* Stadium walls/stands - all four sides */}
+      {/* Left stand */}
+      <mesh position={[-60, 8, 0]} receiveShadow>
+        <boxGeometry args={[4, 16, 80]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+      {/* Right stand */}
+      <mesh position={[60, 8, 0]} receiveShadow>
+        <boxGeometry args={[4, 16, 80]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+      {/* Top stand */}
+      <mesh position={[0, 8, -40]} receiveShadow>
+        <boxGeometry args={[120, 16, 4]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+      {/* Bottom stand */}
+      <mesh position={[0, 8, 40]} receiveShadow>
+        <boxGeometry args={[120, 16, 4]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+      </mesh>
+
+      {/* Floodlights */}
+      {[
+        [-55, 20, -35],
+        [-55, 20, 35],
+        [55, 20, -35],
+        [55, 20, 35],
+      ].map((pos, idx) => (
+        <group key={idx} position={pos as [number, number, number]}>
+          <mesh>
+            <cylinderGeometry args={[0.3, 0.3, 12, 8]} />
+            <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
+          </mesh>
+          <pointLight position={[0, 2, 0]} intensity={300} distance={60} color="#ffffff" />
+        </group>
+      ))}
+
+      {/* Advertising boards around field */}
+      {[-52, 52].map((x, idx) => (
+        <mesh key={`ad-lr-${idx}`} position={[x, 1, 0]} rotation={[0, idx === 0 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+          <planeGeometry args={[60, 2]} />
+          <meshStandardMaterial color="#0066cc" roughness={0.6} />
+        </mesh>
+      ))}
+      {[-32, 32].map((z, idx) => (
+        <mesh key={`ad-tb-${idx}`} position={[0, 1, z]} rotation={[0, idx === 0 ? Math.PI : 0, 0]}>
+          <planeGeometry args={[100, 2]} />
+          <meshStandardMaterial color="#cc0000" roughness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
+// Enhanced field markings
+const FieldMarkings = () => {
+  return (
+    <group position={[0, 0.02, 0]}>
+      {/* Center line */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.2, FIELD_HEIGHT / 10]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+      </mesh>
+
+      {/* Center circle */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[6, 6.2, 64]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+      </mesh>
+
+      {/* Center spot */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.2, 32]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+      </mesh>
+
+      {/* Penalty boxes */}
+      {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => (
+        <group key={idx}>
+          {/* Penalty box outline */}
+          <lineSegments position={[x, 0, 0]}>
+            <edgesGeometry args={[new THREE.BoxGeometry(13, 0, 26)]} />
+            <lineBasicMaterial color="#ffffff" linewidth={2} />
+          </lineSegments>
+          {/* Goal box */}
+          <lineSegments position={[x, 0, 0]}>
+            <edgesGeometry args={[new THREE.BoxGeometry(5.5, 0, 11)]} />
+            <lineBasicMaterial color="#ffffff" linewidth={2} />
+          </lineSegments>
+          {/* Penalty spot */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x + (idx === 0 ? 6.5 : -6.5), 0, 0]}>
+            <circleGeometry args={[0.2, 32]} />
+            <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+          </mesh>
+          {/* Penalty arc */}
+          <mesh rotation={[-Math.PI / 2, 0, idx === 0 ? 0 : Math.PI]} position={[x + (idx === 0 ? 6.5 : -6.5), 0, 0]}>
+            <ringGeometry args={[9.15, 9.35, 32, 1, Math.PI * 0.37, Math.PI * 0.26]} />
+            <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Corner arcs */}
+      {[
+        [-FIELD_WIDTH / 20, -FIELD_HEIGHT / 20],
+        [-FIELD_WIDTH / 20, FIELD_HEIGHT / 20],
+        [FIELD_WIDTH / 20, -FIELD_HEIGHT / 20],
+        [FIELD_WIDTH / 20, FIELD_HEIGHT / 20],
+      ].map((pos, idx) => (
+        <mesh
+          key={idx}
+          rotation={[-Math.PI / 2, 0, idx * Math.PI / 2]}
+          position={[pos[0], 0, pos[1]]}
+        >
+          <ringGeometry args={[1, 1.2, 16, 1, 0, Math.PI / 2]} />
+          <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
+// POV Scene
+const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) => {
+  return (
+    <>
+      {/* Camera with auto-tracking */}
+      <CameraController player={player} ball={ball} />
+
       <group>
         {/* Lighting */}
-        <ambientLight intensity={0.6} />
+        <ambientLight intensity={0.5} />
         <directionalLight
-          position={[20, 30, 20]}
-          intensity={1}
+          position={[20, 40, 20]}
+          intensity={1.2}
           castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
         />
-        <hemisphereLight intensity={0.3} groundColor="#555555" />
+        <hemisphereLight intensity={0.4} groundColor="#0a3a2a" />
+
+        {/* Stadium features */}
+        <Stadium />
 
         {/* Field */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -108,17 +260,14 @@ const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) =>
           <meshStandardMaterial color="#10b981" roughness={0.8} metalness={0.1} />
         </mesh>
 
-        {/* Field lines */}
+        {/* Field border */}
         <lineSegments position={[0, 0.01, 0]}>
           <edgesGeometry args={[new THREE.PlaneGeometry(FIELD_WIDTH / 10, FIELD_HEIGHT / 10)]} />
-          <lineBasicMaterial color="#ffffff" opacity={0.6} transparent />
+          <lineBasicMaterial color="#ffffff" opacity={0.9} transparent linewidth={2} />
         </lineSegments>
 
-        {/* Center circle */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-          <ringGeometry args={[6, 6.2, 64]} />
-          <meshBasicMaterial color="#ffffff" opacity={0.8} transparent />
-        </mesh>
+        {/* Enhanced field markings */}
+        <FieldMarkings />
 
         {/* Goals */}
         {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => {
