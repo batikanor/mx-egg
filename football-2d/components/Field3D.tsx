@@ -277,9 +277,9 @@ const FieldMarkings = () => {
         <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
       </mesh>
 
-      {/* Center circle */}
+      {/* Center circle - 9.15m radius */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[6, 6.2, 64]} />
+        <ringGeometry args={[9.15 * (600 / 68) / 10, 9.15 * (600 / 68) / 10 + 0.2, 64]} />
         <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
       </mesh>
 
@@ -291,12 +291,13 @@ const FieldMarkings = () => {
 
       {/* Penalty boxes - FIFA standard 16.5m x 40.32m */}
       {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => {
-        // FIFA standard dimensions in meters, converted to units (divide by 10 for our scale)
-        const penaltyBoxDepth = 16.5 / 10; // 16.5m from goal line
-        const penaltyBoxWidth = 40.32 / 10; // 40.32m wide
-        const goalBoxDepth = 5.5 / 10; // 5.5m from goal line (6-yard box)
-        const goalBoxWidth = 18.32 / 10; // 18.32m wide (20 yards)
-        const penaltySpotDistance = 11 / 10; // 11m from goal line (12 yards)
+        // FIFA standard dimensions: 105m x 68m pitch -> 1000 x 600 units
+        // Conversion: x-axis = meters * (1000/105), z-axis = meters * (600/68)
+        const penaltyBoxDepth = 16.5 * (1000 / 105) / 10; // 16.5m from goal line
+        const penaltyBoxWidth = 40.32 * (600 / 68) / 10; // 40.32m wide
+        const goalBoxDepth = 5.5 * (1000 / 105) / 10; // 5.5m from goal line (6-yard box)
+        const goalBoxWidth = 18.32 * (600 / 68) / 10; // 18.32m wide (20 yards)
+        const penaltySpotDistance = 11 * (1000 / 105) / 10; // 11m from goal line (12 yards)
 
         return (
           <group key={idx}>
@@ -315,15 +316,6 @@ const FieldMarkings = () => {
             {/* Penalty spot */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[idx === 0 ? x + penaltySpotDistance : x - penaltySpotDistance, 0, 0]}>
               <circleGeometry args={[0.2, 32]} />
-              <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
-            </mesh>
-
-            {/* Penalty arc - only the part outside the box */}
-            <mesh
-              rotation={[-Math.PI / 2, 0, idx === 0 ? 0 : Math.PI]}
-              position={[idx === 0 ? x + penaltySpotDistance : x - penaltySpotDistance, 0, 0]}
-            >
-              <ringGeometry args={[9.15 / 10, 9.35 / 10, 64, 1, Math.PI * 0.37, Math.PI * 0.26]} />
               <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
             </mesh>
           </group>
