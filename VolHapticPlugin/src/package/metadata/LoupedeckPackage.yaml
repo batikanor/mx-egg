@@ -1,0 +1,78 @@
+# ==================================================================================================
+# GENERAL SETTINGS
+# ==================================================================================================
+
+# Package type. Must be plugin4 for plugins.
+type: plugin4
+
+# Name that identifies the plugin internally.
+name: VolHaptic
+
+# Plugin name that is shown to the user in the UI.
+displayName: VolHaptic
+
+# Short description of the plugin. 
+# IMPROVEMENT: Added a clear description of what the plugin actually does.
+description: dynamic haptic feedback synchronized with system audio. Feel the beat and bass of your music or games directly on your Loupedeck device.
+
+# Name of the plugin library file.
+pluginFileName: VolHapticPlugin.dll
+
+# Plugin version. 
+# IMPROVEMENT: Use Semantic Versioning (Major.Minor.Patch).
+version: 1.0.0
+
+# Author of the plugin.
+author: Zhihao Chen
+
+# Copyright information.
+copyright: Copyright © 2025 Zhihao Chen. All rights reserved.
+
+
+# ==================================================================================================
+# PLUGIN PROPERTIES
+# ==================================================================================================
+
+# Location of plugin files on Windows (relative to the plugin base directory).
+pluginFolderWin: bin
+
+# Location of plugin files on macOS.
+# NOTE: Commented out because our C# code currently relies on Windows COM/WASAPI.
+# pluginFolderMac: bin
+
+# List of devices the plugin is optimized for.
+supportedDevices:
+    # LoupedeckCtFamily covers: Loupedeck CT, Live, Live S, Razer Stream Controller.
+    # NOTE: Kept this active because these are the devices that actually contain Haptic motors.
+    - LoupedeckCtFamily
+
+    # LoupedeckPlusFamily covers Loupedeck+. 
+    # NOTE: Kept commented out because Loupedeck+ DOES NOT have haptic hardware.
+    #- LoupedeckPlusFamily
+
+# List of plugin capabilities.
+pluginCapabilities:
+    # HasHapticMapping allows the plugin to control vibration motors.
+    - HasHapticMapping
+
+# Minimum Loupedeck version supported by the plugin.
+minimumLoupedeckVersion: 6.0
+
+
+# ==================================================================================================
+# LOUPEDECK MARKETPLACE SETTINGS
+# ==================================================================================================
+
+# License type.
+license: MIT
+
+# URL of the plugin license.
+licenseUrl: https://opensource.org/licenses/MIT
+
+# URL of the support page.
+# IMPROVEMENT: If you don't have a URL yet, leave this commented, 
+# but if you have a GitHub, uncomment it so users can report bugs.
+#supportPageUrl: https://github.com/YourUsername/VolHaptic/issues
+
+# URL of the plugin homepage.
+#homePageUrl: https://github.com/YourUsername/VolHaptic
