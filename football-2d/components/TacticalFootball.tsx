@@ -47,6 +47,39 @@ const SECTORS = [
   { id: 6, x: 0, y: 2, label: 'Bot-Left' },   { id: 7, x: 1, y: 2, label: 'Bot-Mid' },   { id: 8, x: 2, y: 2, label: 'Bot-Right' },
 ];
 
+const GAME_KNOWLEDGE = {
+  roleDescriptions: {
+    GK: 'Goalkeeper - Primary defender of your goal. Stay near your goal and block shots.',
+    FIELD: 'Field Player - Offensive and defensive duties. Chase ball, pass, shoot, and support teammates.'
+  },
+  strategyGuidelines: {
+    offensive: [
+      '⚡ Ball Pressure - Aggressively chase and pressure the ball carrier',
+      '🚀 Press Forward - Push toward opponent goal for scoring opportunities',
+      '⚔️ Forward Support - Stay upfield to receive passes and create chances',
+      '🎨 Playmaker - Position to create passing lanes and control tempo',
+      '💨 Counter Attack - Quick transition from defense to attack',
+      '🎪 Wing Play - Position wide to stretch opponent defense'
+    ],
+    defensive: [
+      '🛡️ Defensive Cover - Stay between ball and your goal to protect',
+      '🔒 Mark Player - Shadow and pressure specific opponent',
+      '🏰 Hold Position - Maintain defensive shape and position',
+      '🎯 Zone Lock - Control a specific area of the field'
+    ],
+    balanced: [
+      '🔄 Box-to-Box - Dynamically move between attack and defense',
+      '⚖️ Balanced - Adapt role based on game flow',
+      '⏱️ Possession - Focus on keeping the ball and controlling pace'
+    ]
+  },
+  whenToUseStrategies: {
+    winning: 'When ahead: Use defensive strategies (🛡️ Defensive Cover, 🏰 Hold Position) to protect your lead. Maintain possession (⏱️).',
+    losing: 'When behind: Use offensive strategies (🚀 Press Forward, ⚡ Ball Pressure, ⚔️ Forward Support) to create scoring chances.',
+    tied: 'When tied: Use balanced strategies (🔄 Box-to-Box, ⚖️ Balanced) to adapt to game flow and exploit opportunities.'
+  }
+};
+
 // --- Helper Functions ---
 
 const isGoal = (x: number, y: number) => {
@@ -89,6 +122,31 @@ interface PlayerKnowledge {
   team: 'red' | 'blue';
   currentScore: { red: number; blue: number };
   fovScreenshots: string[]; // Array of base64 image data URLs (last 10)
+
+  // Strategic information
+  myCurrentStrategy: string;
+  teammateStrategies: { playerId: string; strategy: string }[];
+
+  // Game context
+  myGoalSide: 'left' | 'right'; // Which side is my goal
+  opponentGoalSide: 'left' | 'right'; // Which side is opponent's goal
+  myRole: 'GK' | 'FIELD';
+
+  // Game knowledge
+  roleDescriptions: {
+    GK: string;
+    FIELD: string;
+  };
+  strategyGuidelines: {
+    offensive: string[];
+    defensive: string[];
+    balanced: string[];
+  };
+  whenToUseStrategies: {
+    winning: string;
+    losing: string;
+    tied: string;
+  };
 }
 
 // --- Components ---
@@ -270,13 +328,35 @@ export default function TacticalFootball() {
 
       // Initialize knowledge base for all players
       const newKnowledge = new Map<string, PlayerKnowledge>();
-      [...gameState.current.red, ...gameState.current.blue].forEach(player => {
+      const allPlayers = [...gameState.current.red, ...gameState.current.blue];
+
+      allPlayers.forEach(player => {
         const isRed = player.id.startsWith('r');
+        const team = isRed ? 'red' : 'blue';
+        const teammates = allPlayers.filter(p => p.id !== player.id && p.id.startsWith(player.id[0]));
+
         newKnowledge.set(player.id, {
           playerId: player.id,
-          team: isRed ? 'red' : 'blue',
+          team,
           currentScore: { red: 0, blue: 0 },
-          fovScreenshots: []
+          fovScreenshots: [],
+
+          // Strategic info
+          myCurrentStrategy: player.role === 'GK' ? '🥅 Goalkeeper' : '⚖️ Balanced',
+          teammateStrategies: teammates.map(t => ({
+            playerId: t.id,
+            strategy: t.role === 'GK' ? '🥅 Goalkeeper' : '⚖️ Balanced'
+          })),
+
+          // Game context
+          myGoalSide: isRed ? 'left' : 'right',
+          opponentGoalSide: isRed ? 'right' : 'left',
+          myRole: player.role,
+
+          // Game knowledge (shared by all players)
+          roleDescriptions: GAME_KNOWLEDGE.roleDescriptions,
+          strategyGuidelines: GAME_KNOWLEDGE.strategyGuidelines,
+          whenToUseStrategies: GAME_KNOWLEDGE.whenToUseStrategies
         });
       });
       setPlayerKnowledge(newKnowledge);

@@ -32,6 +32,31 @@ interface PlayerKnowledge {
   team: 'red' | 'blue';
   currentScore: { red: number; blue: number };
   fovScreenshots: string[];
+
+  // Strategic information
+  myCurrentStrategy: string;
+  teammateStrategies: { playerId: string; strategy: string }[];
+
+  // Game context
+  myGoalSide: 'left' | 'right';
+  opponentGoalSide: 'left' | 'right';
+  myRole: 'GK' | 'FIELD';
+
+  // Game knowledge
+  roleDescriptions: {
+    GK: string;
+    FIELD: string;
+  };
+  strategyGuidelines: {
+    offensive: string[];
+    defensive: string[];
+    balanced: string[];
+  };
+  whenToUseStrategies: {
+    winning: string;
+    losing: string;
+    tied: string;
+  };
 }
 
 interface PlayerPOVProps {
@@ -460,20 +485,61 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
             🧠 Player Knowledge Base
           </h4>
 
-          <div className="space-y-3">
-            {/* Team and Score */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-400">Team:</span>
+          <div className="space-y-4">
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-zinc-900/50 rounded p-2">
+                <span className="text-[10px] text-zinc-500 uppercase block">Team</span>
                 <span className={`text-xs font-bold ${knowledge.team === 'red' ? 'text-red-400' : 'text-blue-400'}`}>
                   {knowledge.team === 'red' ? '🔴 Player FC' : '🔵 CPU United'}
                 </span>
               </div>
+              <div className="bg-zinc-900/50 rounded p-2">
+                <span className="text-[10px] text-zinc-500 uppercase block">Role</span>
+                <span className="text-xs font-bold text-zinc-300">
+                  {knowledge.myRole === 'GK' ? '🥅 Goalkeeper' : '⚽ Field Player'}
+                </span>
+              </div>
+              <div className="bg-zinc-900/50 rounded p-2">
+                <span className="text-[10px] text-zinc-500 uppercase block">My Goal</span>
+                <span className="text-xs font-bold text-emerald-400">
+                  {knowledge.myGoalSide === 'left' ? '← Left Side' : 'Right Side →'}
+                </span>
+              </div>
+              <div className="bg-zinc-900/50 rounded p-2">
+                <span className="text-[10px] text-zinc-500 uppercase block">Opponent Goal</span>
+                <span className="text-xs font-bold text-orange-400">
+                  {knowledge.opponentGoalSide === 'left' ? '← Left Side' : 'Right Side →'}
+                </span>
+              </div>
+            </div>
+
+            {/* Score */}
+            <div className="bg-zinc-900/50 rounded p-2 flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500 uppercase">Current Score</span>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-zinc-400">Score:</span>
-                <span className="text-xs font-bold text-red-400">{knowledge.currentScore.red}</span>
+                <span className="text-sm font-bold text-red-400">{knowledge.currentScore.red}</span>
                 <span className="text-xs text-zinc-500">-</span>
-                <span className="text-xs font-bold text-blue-400">{knowledge.currentScore.blue}</span>
+                <span className="text-sm font-bold text-blue-400">{knowledge.currentScore.blue}</span>
+              </div>
+            </div>
+
+            {/* My Strategy */}
+            <div className="bg-zinc-900/50 rounded p-2">
+              <span className="text-[10px] text-zinc-500 uppercase block mb-1">My Current Strategy</span>
+              <span className="text-xs font-bold text-yellow-400">{knowledge.myCurrentStrategy}</span>
+            </div>
+
+            {/* Teammate Strategies */}
+            <div className="bg-zinc-900/50 rounded p-2">
+              <span className="text-[10px] text-zinc-500 uppercase block mb-2">Teammate Strategies</span>
+              <div className="space-y-1">
+                {knowledge.teammateStrategies.map((teammate, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-400">Player {teammate.playerId.replace(/[rb]/, '')}</span>
+                    <span className="text-zinc-300 font-medium">{teammate.strategy}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -498,6 +564,63 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Game Knowledge */}
+            <div className="border-t border-zinc-700 pt-3 mt-2">
+              <h5 className="text-xs font-bold text-zinc-400 uppercase mb-2">📚 Game Knowledge</h5>
+
+              {/* Role Descriptions */}
+              <div className="bg-zinc-900/50 rounded p-2 mb-2">
+                <span className="text-[10px] text-zinc-500 uppercase block mb-1">Role Descriptions</span>
+                <div className="space-y-1 text-[11px] text-zinc-400">
+                  <div><span className="text-emerald-400 font-medium">GK:</span> {knowledge.roleDescriptions.GK}</div>
+                  <div><span className="text-emerald-400 font-medium">FIELD:</span> {knowledge.roleDescriptions.FIELD}</div>
+                </div>
+              </div>
+
+              {/* Strategy When */}
+              <div className="bg-zinc-900/50 rounded p-2 mb-2">
+                <span className="text-[10px] text-zinc-500 uppercase block mb-1">Strategy Recommendations</span>
+                <div className="space-y-1 text-[11px] text-zinc-400">
+                  <div><span className="text-green-400 font-medium">Winning:</span> {knowledge.whenToUseStrategies.winning}</div>
+                  <div><span className="text-red-400 font-medium">Losing:</span> {knowledge.whenToUseStrategies.losing}</div>
+                  <div><span className="text-yellow-400 font-medium">Tied:</span> {knowledge.whenToUseStrategies.tied}</div>
+                </div>
+              </div>
+
+              {/* Available Strategies */}
+              <details className="bg-zinc-900/50 rounded p-2">
+                <summary className="text-[10px] text-zinc-500 uppercase cursor-pointer hover:text-zinc-400">
+                  Available Strategies (click to expand)
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <div>
+                    <span className="text-[10px] text-red-400 font-bold uppercase block mb-1">Offensive</span>
+                    <ul className="space-y-0.5 text-[10px] text-zinc-400 pl-3">
+                      {knowledge.strategyGuidelines.offensive.map((strat, idx) => (
+                        <li key={idx}>• {strat}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-blue-400 font-bold uppercase block mb-1">Defensive</span>
+                    <ul className="space-y-0.5 text-[10px] text-zinc-400 pl-3">
+                      {knowledge.strategyGuidelines.defensive.map((strat, idx) => (
+                        <li key={idx}>• {strat}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-yellow-400 font-bold uppercase block mb-1">Balanced</span>
+                    <ul className="space-y-0.5 text-[10px] text-zinc-400 pl-3">
+                      {knowledge.strategyGuidelines.balanced.map((strat, idx) => (
+                        <li key={idx}>• {strat}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         </div>
