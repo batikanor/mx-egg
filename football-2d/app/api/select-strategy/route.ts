@@ -83,7 +83,7 @@ Respond in JSON format:
         'X-Title': 'Football 2D Tactical Game',
       },
       body: JSON.stringify({
-        model: 'x-ai/grok-4-1-fast-non-reasoning', // Grok 4.1 Fast for instant responses with vision
+        model: 'x-ai/grok-4.1-fast', // Grok 4.1 Fast with vision support
         messages: [
           {
             role: 'user',
