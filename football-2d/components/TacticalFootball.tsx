@@ -883,49 +883,57 @@ export default function TacticalFootball() {
     const allPlayerIds = [...renderRed, ...renderBlue].map(p => p.id);
     if (allPlayerIds.length === 0) return;
 
-    const strategyUpdateInterval = setInterval(async () => {
+    const strategyUpdateInterval = setInterval(() => {
       // Pick a random player to update strategy
       const randomPlayerId = allPlayerIds[Math.floor(Math.random() * allPlayerIds.length)];
       const knowledge = playerKnowledge.get(randomPlayerId);
 
       if (!knowledge || knowledge.fovScreenshots.length === 0) return;
 
-      try {
-        // Get all available strategies
-        const allStrategies = [
-          ...GAME_KNOWLEDGE.strategyGuidelines.offensive,
-          ...GAME_KNOWLEDGE.strategyGuidelines.defensive,
-          ...GAME_KNOWLEDGE.strategyGuidelines.balanced,
-        ];
+      // Fire and forget - don't await, don't block the game
+      (async () => {
+        const startTime = Date.now();
 
-        // Call AI API
-        const response = await fetch('/api/select-strategy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            playerKnowledge: knowledge,
-            availableStrategies: allStrategies,
-          }),
-        });
+        try {
+          console.log('🤖 Requesting AI decision for player', randomPlayerId, '- Knowledge sent to AI, awaiting response...');
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ AI STRATEGY SELECTION FAILED:', {
-            player: randomPlayerId,
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
+          // Get all available strategies
+          const allStrategies = [
+            ...GAME_KNOWLEDGE.strategyGuidelines.offensive,
+            ...GAME_KNOWLEDGE.strategyGuidelines.defensive,
+            ...GAME_KNOWLEDGE.strategyGuidelines.balanced,
+          ];
+
+          // Call AI API (non-blocking)
+          const response = await fetch('/api/select-strategy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerKnowledge: knowledge,
+              availableStrategies: allStrategies,
+            }),
           });
-          return;
-        }
 
-        const data = await response.json();
-        console.log('✅ AI Strategy Decision:', {
-          player: randomPlayerId,
-          previousStrategy: playerKnowledge.get(randomPlayerId)?.myCurrentStrategy,
-          selectedStrategy: data.selectedStrategy,
-          reasoning: data.reasoning
-        });
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ AI STRATEGY SELECTION FAILED (${elapsed}s):`, {
+              player: randomPlayerId,
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText
+            });
+            return;
+          }
+
+          const data = await response.json();
+          console.log(`✅ AI Strategy Decision received (${elapsed}s):`, {
+            player: randomPlayerId,
+            previousStrategy: playerKnowledge.get(randomPlayerId)?.myCurrentStrategy,
+            selectedStrategy: data.selectedStrategy,
+            reasoning: data.reasoning
+          });
 
         // Update player knowledge with new strategy and thought
         setPlayerKnowledge(prev => {
@@ -964,9 +972,11 @@ export default function TacticalFootball() {
           }
           return updated;
         });
-      } catch (error) {
-        console.error('Error updating strategy for', randomPlayerId, ':', error);
-      }
+        } catch (error) {
+          console.error('❌ Error updating strategy for', randomPlayerId, ':', error);
+        }
+      })(); // IIFE - fire and forget, non-blocking
+
     }, 5000); // Every 5 seconds
 
     return () => clearInterval(strategyUpdateInterval);
