@@ -832,7 +832,8 @@ export default function TacticalFootball() {
     // Give the canvas a moment to render before capturing
     setTimeout(() => {
       try {
-        const screenshot = canvas.toDataURL('image/jpeg', 0.7);
+        // Use lower quality JPEG (0.3) for faster encoding and smaller file size
+        const screenshot = canvas.toDataURL('image/jpeg', 0.3);
 
         // Check if it's not a blank canvas (all black/white)
         if (screenshot && screenshot.length > 1000) {
@@ -874,7 +875,7 @@ export default function TacticalFootball() {
       // Rotate to next player (each player gets captured once per cycle)
       currentCaptureIndex.current = (currentCaptureIndex.current + 1) % allPlayerIds.length;
       setBackgroundCapturePlayer(allPlayerIds[currentCaptureIndex.current]);
-    }, 1000 / allPlayerIds.length) as unknown as number; // Divide second by number of players for smooth rotation
+    }, 500) as unknown as number; // Capture every 500ms (slower = less CPU load)
 
     return () => {
       if (screenshotTimer.current) {
