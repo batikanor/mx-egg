@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { getPlayerStrategy } from './StrategyPanel';
 
 // Constants from main game
 const FIELD_WIDTH = 1000;
@@ -50,11 +51,28 @@ const to3D = (x: number, y: number, z: number = 0) => {
 };
 
 // 3D Player Component
-const Player3D = ({ player, isRed, isLocked }: { player: Player; isRed: boolean; isLocked: boolean }) => {
+const Player3D = ({
+  player,
+  isRed,
+  isLocked,
+  ball,
+  team,
+  lockedPlayers
+}: {
+  player: Player;
+  isRed: boolean;
+  isLocked: boolean;
+  ball: Ball;
+  team: Player[];
+  lockedPlayers: Map<string, LockInfo>;
+}) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [x, y, z] = to3D(player.x, player.y, 1.2);
 
   const color = isLocked ? '#f59e0b' : (isRed ? '#dc2626' : '#2563eb');
+
+  // Get strategy icon
+  const { icon } = getPlayerStrategy(player, isRed, ball, team, lockedPlayers);
 
   return (
     <group position={[x, y, z]}>
@@ -87,6 +105,19 @@ const Player3D = ({ player, isRed, isLocked }: { player: Player; isRed: boolean;
         anchorY="middle"
       >
         {player.id.replace(/[rb]/, '')}
+      </Text>
+
+      {/* Strategy Icon - Floating above */}
+      <Text
+        position={[0, 3.2, 0]}
+        fontSize={0.6}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.05}
+        outlineColor="#000000"
+      >
+        {icon}
       </Text>
 
       {/* Locked indicator */}
@@ -231,6 +262,9 @@ const Scene = ({ redTeam, blueTeam, ball, lockedPlayers }: Field3DProps) => {
           player={p}
           isRed={true}
           isLocked={lockedPlayers.has(p.id)}
+          ball={ball}
+          team={redTeam}
+          lockedPlayers={lockedPlayers}
         />
       ))}
       {blueTeam.map(p => (
@@ -239,6 +273,9 @@ const Scene = ({ redTeam, blueTeam, ball, lockedPlayers }: Field3DProps) => {
           player={p}
           isRed={false}
           isLocked={false}
+          ball={ball}
+          team={blueTeam}
+          lockedPlayers={lockedPlayers}
         />
       ))}
 

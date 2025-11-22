@@ -42,19 +42,20 @@ const SECTORS = [
   { id: 8, label: 'Bot-Right' },
 ];
 
-const getPlayerStrategy = (
+export const getPlayerStrategy = (
   player: Player,
   isRed: boolean,
   ball: Ball,
   team: Player[],
   lockedPlayers: Map<string, LockInfo>
-): { current: string; possible: string[] } => {
+): { current: string; possible: string[]; icon: string } => {
   const possible = [];
 
   if (player.role === 'GK') {
     return {
       current: '🥅 Goalkeeper',
-      possible: ['Goalkeeper (fixed role)'],
+      possible: ['🥅 Goalkeeper (fixed role)'],
+      icon: '🥅',
     };
   }
 
@@ -76,29 +77,65 @@ const getPlayerStrategy = (
 
   // Current strategy
   let current = '';
+  let icon = '';
   if (isRed && lock) {
     const sector = SECTORS.find((s) => s.id === lock.targetSector);
-    current = `🎯 Locked: ${sector?.label || 'Unknown'}`;
+    current = `🎯 Zone Lock: ${sector?.label || 'Unknown'}`;
+    icon = '🎯';
   } else if (isChaser) {
-    current = '⚡ Chasing Ball';
+    current = '⚡ Ball Pressure';
+    icon = '⚡';
   } else {
-    current = '🛡️ Supporting';
+    // Determine support role based on position
+    const playerIdx = parseInt(player.id.replace(/[rb]/, ''));
+    if (playerIdx === 1) {
+      current = '🛡️ Defensive Cover';
+      icon = '🛡️';
+    } else if (playerIdx === 2) {
+      current = '🔄 Box-to-Box';
+      icon = '🔄';
+    } else {
+      current = '⚔️ Forward Support';
+      icon = '⚔️';
+    }
   }
 
   // Possible strategies
   if (isRed) {
-    possible.push('⚡ Ball Chaser (auto)');
-    possible.push('🛡️ Support Role (auto)');
+    // Offensive Strategies
+    possible.push('⚡ Ball Pressure - Chase the ball');
+    possible.push('🚀 Press Forward - Attack aggressively');
+    possible.push('🎨 Playmaker - Create chances');
+    possible.push('⚔️ Forward Support - Stay upfield');
+
+    // Defensive Strategies
+    possible.push('🛡️ Defensive Cover - Protect goal');
+    possible.push('🔒 Mark Player - Shadow opponent');
+    possible.push('🏰 Hold Position - Stay in place');
+
+    // Balanced Strategies
+    possible.push('🔄 Box-to-Box - Dynamic movement');
+    possible.push('⚖️ Balanced - Adapt to play');
+
+    // Zone Strategies
     SECTORS.forEach((s) => {
-      possible.push(`🎯 Lock to ${s.label}`);
+      possible.push(`🎯 Zone Lock: ${s.label}`);
     });
+
+    // Special Strategies
+    possible.push('💨 Counter Attack - Quick breaks');
+    possible.push('🎪 Wing Play - Wide positioning');
+    possible.push('⏱️ Possession - Keep the ball');
   } else {
-    possible.push('⚡ Ball Chaser (AI)');
-    possible.push('🛡️ Support Role (AI)');
-    possible.push('🤖 AI Controlled');
+    possible.push('⚡ Ball Pressure (AI)');
+    possible.push('🛡️ Defensive Cover (AI)');
+    possible.push('🔄 Box-to-Box (AI)');
+    possible.push('⚔️ Forward Support (AI)');
+    possible.push('🚀 Press Forward (AI)');
+    possible.push('🤖 Adaptive AI - Auto-adjust');
   }
 
-  return { current, possible };
+  return { current, possible, icon };
 };
 
 export const StrategyPanel: React.FC<StrategyPanelProps> = ({
@@ -117,7 +154,7 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
         </h3>
         <div className="space-y-3">
           {redTeam.map((player) => {
-            const { current, possible } = getPlayerStrategy(
+            const { current, possible, icon } = getPlayerStrategy(
               player,
               true,
               ball,
@@ -131,8 +168,9 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                    <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white relative">
                       {player.id.replace('r', '')}
+                      <span className="absolute -top-1 -right-1 text-xs">{icon}</span>
                     </div>
                     <span className="text-xs font-semibold text-zinc-300">
                       Player {player.id.replace('r', '')}
@@ -168,7 +206,7 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
         </h3>
         <div className="space-y-3">
           {blueTeam.map((player) => {
-            const { current, possible } = getPlayerStrategy(
+            const { current, possible, icon } = getPlayerStrategy(
               player,
               false,
               ball,
@@ -182,8 +220,9 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white relative">
                       {player.id.replace('b', '')}
+                      <span className="absolute -top-1 -right-1 text-xs">{icon}</span>
                     </div>
                     <span className="text-xs font-semibold text-zinc-300">
                       Player {player.id.replace('b', '')}

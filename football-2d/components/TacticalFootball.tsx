@@ -623,6 +623,8 @@ export default function TacticalFootball() {
         </div>
       </div>
 
+      <div className="my-12" />
+
       <StrategyPanel
         redTeam={renderRed}
         blueTeam={renderBlue}
