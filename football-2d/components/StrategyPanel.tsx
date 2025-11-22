@@ -28,6 +28,8 @@ interface StrategyPanelProps {
   blueTeam: Player[];
   ball: Ball;
   lockedPlayers: Map<string, LockInfo>;
+  onPlayerClick: (playerId: string) => void;
+  selectedPlayer: string | null;
 }
 
 const SECTORS = [
@@ -143,6 +145,8 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
   blueTeam,
   ball,
   lockedPlayers,
+  onPlayerClick,
+  selectedPlayer,
 }) => {
   return (
     <div className="w-full max-w-6xl grid grid-cols-2 gap-6 mt-8">
@@ -161,10 +165,14 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
               redTeam,
               lockedPlayers
             );
+            const isSelected = selectedPlayer === player.id;
             return (
               <div
                 key={player.id}
-                className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3"
+                className={`bg-zinc-800/50 border rounded-lg p-3 transition-all cursor-pointer hover:border-red-500 ${
+                  isSelected ? 'border-red-500 ring-2 ring-red-500/50' : 'border-zinc-700'
+                }`}
+                onClick={() => onPlayerClick(player.id)}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -172,8 +180,9 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
                       {player.id.replace('r', '')}
                       <span className="absolute -top-1 -right-1 text-xs">{icon}</span>
                     </div>
-                    <span className="text-xs font-semibold text-zinc-300">
+                    <span className={`text-xs font-semibold ${isSelected ? 'text-red-400' : 'text-zinc-300'}`}>
                       Player {player.id.replace('r', '')}
+                      {isSelected && ' 📷'}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-red-400">
@@ -213,10 +222,14 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
               blueTeam,
               lockedPlayers
             );
+            const isSelected = selectedPlayer === player.id;
             return (
               <div
                 key={player.id}
-                className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3"
+                className={`bg-zinc-800/50 border rounded-lg p-3 transition-all cursor-pointer hover:border-blue-500 ${
+                  isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-zinc-700'
+                }`}
+                onClick={() => onPlayerClick(player.id)}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -224,8 +237,9 @@ export const StrategyPanel: React.FC<StrategyPanelProps> = ({
                       {player.id.replace('b', '')}
                       <span className="absolute -top-1 -right-1 text-xs">{icon}</span>
                     </div>
-                    <span className="text-xs font-semibold text-zinc-300">
+                    <span className={`text-xs font-semibold ${isSelected ? 'text-blue-400' : 'text-zinc-300'}`}>
                       Player {player.id.replace('b', '')}
+                      {isSelected && ' 📷'}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-blue-400">

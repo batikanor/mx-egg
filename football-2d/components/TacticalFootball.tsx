@@ -86,15 +86,13 @@ interface LockInfo {
 
 // --- Components ---
 
-const MainField = ({ redTeam, blueTeam, ball, lockedPlayers, matchState, announcerMsg, onPlayerClick, selectedPlayer }: {
+const MainField = ({ redTeam, blueTeam, ball, lockedPlayers, matchState, announcerMsg }: {
   redTeam: Player[];
   blueTeam: Player[];
   ball: Ball;
   lockedPlayers: Map<string, LockInfo>;
   matchState: string;
   announcerMsg: string;
-  onPlayerClick: (playerId: string) => void;
-  selectedPlayer: string | null;
 }) => (
   <div
       className="relative bg-emerald-600 rounded-lg overflow-hidden border-4 border-zinc-800 shadow-2xl mb-8 select-none"
@@ -120,23 +118,19 @@ const MainField = ({ redTeam, blueTeam, ball, lockedPlayers, matchState, announc
       {/* Entities */}
       {blueTeam.map(p => (
           <div key={p.id}
-              className={`absolute w-5 h-5 bg-blue-600 rounded-full border-2 shadow-sm flex items-center justify-center z-10 cursor-pointer transition-all hover:scale-125 ${selectedPlayer === p.id ? 'border-yellow-400 ring-2 ring-yellow-400' : 'border-white'}`}
+              className="absolute w-5 h-5 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center z-10"
               style={{ left: `${(p.x/FIELD_WIDTH)*100}%`, top: `${(p.y/FIELD_HEIGHT)*100}%`, transform: 'translate(-50%, -50%)' }}
-              onClick={() => onPlayerClick(p.id)}
           >
              <span className="text-[8px] text-white font-bold">{p.id.replace('b','')}</span>
           </div>
       ))}
       {redTeam.map(p => {
           const isLocked = lockedPlayers.has(p.id);
-          const isSelected = selectedPlayer === p.id;
           return (
             <div key={p.id}
-                className={`absolute w-5 h-5 rounded-full border-2 shadow-sm flex items-center justify-center z-10 cursor-pointer transition-all hover:scale-125
-                  ${isLocked ? 'bg-amber-500 border-amber-200' : 'bg-red-600'}
-                  ${isSelected ? 'border-yellow-400 ring-2 ring-yellow-400' : 'border-white'}`}
+                className={`absolute w-5 h-5 rounded-full border-2 shadow-sm flex items-center justify-center z-10
+                  ${isLocked ? 'bg-amber-500 border-amber-200' : 'bg-red-600 border-white'}`}
                 style={{ left: `${(p.x/FIELD_WIDTH)*100}%`, top: `${(p.y/FIELD_HEIGHT)*100}%`, transform: 'translate(-50%, -50%)' }}
-                onClick={() => onPlayerClick(p.id)}
             >
               <span className="text-[8px] text-white font-bold">{p.id.replace('r','')}</span>
               {isLocked && <div className="absolute -top-3 w-2 h-2 border border-amber-400 rounded-full animate-ping" />}
@@ -610,7 +604,7 @@ export default function TacticalFootball() {
       {is3DMode ? (
         <Field3D redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} announcerMsg={announcerMsg} />
       ) : (
-        <MainField redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} matchState={gameState.current.matchState} announcerMsg={announcerMsg} onPlayerClick={setSelectedPlayer} selectedPlayer={selectedPlayer} />
+        <MainField redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} matchState={gameState.current.matchState} announcerMsg={announcerMsg} />
       )}
 
       <div className="flex flex-col items-center gap-4">
@@ -636,6 +630,8 @@ export default function TacticalFootball() {
         blueTeam={renderBlue}
         ball={renderBall}
         lockedPlayers={lockedPlayersUI}
+        onPlayerClick={setSelectedPlayer}
+        selectedPlayer={selectedPlayer}
       />
 
       {/* Player First-Person POV */}
