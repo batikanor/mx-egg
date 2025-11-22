@@ -12,6 +12,7 @@ import {
   SquareDashedBottom
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import StrategyPanel from './StrategyPanel';
 
 const Field3D = dynamic(() => import('./Field3D'), { ssr: false });
 
@@ -621,6 +622,13 @@ export default function TacticalFootball() {
             <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-1 h-8 bg-zinc-800" />
         </div>
       </div>
+
+      <StrategyPanel
+        redTeam={renderRed}
+        blueTeam={renderBlue}
+        ball={renderBall}
+        lockedPlayers={lockedPlayersUI}
+      />
     </div>
   );
 }
