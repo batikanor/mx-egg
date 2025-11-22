@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
+import { useRef, useEffect, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { SkeletonUtils } from 'three-stdlib';
 import { getPlayerStrategy } from './StrategyPanel';
 
 // Constants from main game
@@ -170,6 +171,196 @@ const Stadium = () => {
   );
 };
 
+// Preload the model once
+useGLTF.preload('/model/Soldier.glb');
+
+// Load Soldier model
+function SoldierModel({ player, isLocked, ball, team, lockedPlayers }: {
+  player: Player;
+  isLocked: boolean;
+  ball: Ball;
+  team: Player[];
+  lockedPlayers: Map<string, LockInfo>;
+}) {
+  // Load the model (shared instance, cached by useGLTF)
+  const { scene, animations } = useGLTF('/model/Soldier.glb');
+  const groupRef = useRef<THREE.Group>(null);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const currentActionRef = useRef<THREE.AnimationAction | null>(null);
+
+  // Get strategy icon
+  const { icon } = getPlayerStrategy(player, true, ball, team, lockedPlayers);
+
+  // Use SkeletonUtils.clone to create a deep clone for each instance
+  // This ensures each player has an independent model with its own animations
+  const clonedScene = useMemo(() => {
+    if (!scene) return null;
+    
+    // SkeletonUtils.clone creates a deep clone including bones and animations
+    const clone = SkeletonUtils.clone(scene);
+    
+    // Reset position of the cloned scene to origin
+    clone.position.set(0, 0, 0);
+    clone.rotation.set(0, 0, 0);
+    clone.scale.set(2, 2, 2);
+    
+    // Set up shadow casting for all meshes
+    clone.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = false;
+      }
+    });
+    
+    // Set a unique name to help debug
+    clone.name = `Soldier_${player.id}`;
+    return clone;
+  }, [scene, player.id]); // player.id ensures each instance gets a new clone
+
+  // Rotation offset to adjust model's default forward direction
+  // Adjust this value if the model faces a different direction (in radians)
+  // Common values: 0 (default), Math.PI/2 (90°), Math.PI (180°), -Math.PI/2 (-90°)
+  const ROTATION_OFFSET = 0;
+
+  // Initialize position - update whenever player position changes
+  useEffect(() => {
+    if (groupRef.current) {
+      const [x, y, z] = to3D(player.x, player.y, 0);
+      groupRef.current.position.set(x, y, z);
+    }
+  }, [player.x, player.y]);
+
+  // Initialize animation mixer
+  useEffect(() => {
+    if (clonedScene && animations.length > 0) {
+      const mixer = new THREE.AnimationMixer(clonedScene);
+      mixerRef.current = mixer;
+
+      // Find animations by name (case-insensitive, partial match)
+      const findAnimation = (name: string) => {
+        return animations.find(a => 
+          a.name.toLowerCase() === name.toLowerCase() || 
+          a.name.toLowerCase().includes(name.toLowerCase())
+        );
+      };
+
+      const idleClip = findAnimation('idle') || animations[0];
+      const walkClip = findAnimation('walk') || animations[0];
+      const runClip = findAnimation('run') || animations[0];
+
+      const idleAction = mixer.clipAction(idleClip);
+      const walkAction = mixer.clipAction(walkClip);
+      const runAction = mixer.clipAction(runClip);
+
+      // Store actions
+      (mixer as any).idleAction = idleAction;
+      (mixer as any).walkAction = walkAction;
+      (mixer as any).runAction = runAction;
+
+      // Start with idle
+      idleAction.play();
+      currentActionRef.current = idleAction;
+
+      return () => {
+        mixer.stopAllAction();
+      };
+    }
+  }, [clonedScene, animations]);
+
+  // Update animation based on speed
+  useFrame((state, delta) => {
+    // Calculate speed
+    const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+
+    if (mixerRef.current) {
+      mixerRef.current.update(delta);
+      
+      // Determine animation based on speed
+      let targetAction: THREE.AnimationAction | null = null;
+      if (speed < 0.5) {
+        targetAction = (mixerRef.current as any).idleAction;
+      } else if (speed < 3) {
+        targetAction = (mixerRef.current as any).walkAction;
+      } else {
+        targetAction = (mixerRef.current as any).runAction;
+      }
+
+      // Switch animation if needed
+      if (targetAction && currentActionRef.current !== targetAction) {
+        if (currentActionRef.current) {
+          currentActionRef.current.fadeOut(0.2);
+        }
+        targetAction.reset().fadeIn(0.2).play();
+        currentActionRef.current = targetAction;
+      }
+    }
+
+    // Update position and rotation - this runs every frame
+    if (groupRef.current) {
+      const [newX, newY, newZ] = to3D(player.x, player.y, 0);
+      // Force update position every frame to ensure it's correct
+      groupRef.current.position.set(newX, newY, newZ);
+
+      // Update rotation to face movement direction
+      // In 3D space: x maps to x, y maps to -z (because of coordinate conversion)
+      // So velocity vector in 3D is (vx, 0, -vy)
+      // atan2(vx, -vy) gives the angle in the x-z plane
+      if (speed > 0.01) {
+        // Calculate angle based on velocity direction
+        // atan2(x, z) where x is vx and z is -vy (because y increases downward in 2D, but z decreases in 3D)
+        const angle = Math.atan2(player.vx, -player.vy) + ROTATION_OFFSET;
+        groupRef.current.rotation.y = angle;
+      }
+      // If speed is very low, keep the last rotation (don't reset to 0)
+    }
+  });
+
+  if (!clonedScene) {
+    return null;
+  }
+
+  // Calculate initial position
+  const [x, y, z] = to3D(player.x, player.y, 0);
+
+  return (
+    <group ref={groupRef} position={[x, y, z]}>
+      <primitive object={clonedScene} castShadow />
+      
+      {/* Jersey number */}
+      <Text
+        position={[0, 1.2, 0.42]}
+        fontSize={0.3}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {player.id.replace(/[rb]/, '')}
+      </Text>
+
+      {/* Strategy Icon - Floating above */}
+      <Text
+        position={[0, 3.2, 0]}
+        fontSize={0.6}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.05}
+        outlineColor="#000000"
+      >
+        {icon}
+      </Text>
+
+      {/* Locked indicator */}
+      {isLocked && (
+        <mesh position={[0, 2.5, 0]}>
+          <ringGeometry args={[0.3, 0.4, 16]} />
+          <meshBasicMaterial color="#f59e0b" side={THREE.DoubleSide} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
 // 3D Player Component
 const Player3D = ({
   player,
@@ -193,6 +384,11 @@ const Player3D = ({
 
   // Get strategy icon
   const { icon } = getPlayerStrategy(player, isRed, ball, team, lockedPlayers);
+
+  // Use Soldier model for red team, simple geometry for blue team
+  if (isRed) {
+    return <SoldierModel player={player} isLocked={isLocked} ball={ball} team={team} lockedPlayers={lockedPlayers} />;
+  }
 
   return (
     <group position={[x, y, z]}>
