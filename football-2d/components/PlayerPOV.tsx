@@ -27,6 +27,29 @@ interface Ball {
   vy: number;
 }
 
+interface TrajectoryPoint {
+  x: number;
+  y: number;
+  t: number;
+  velocity?: { vx: number; vy: number };
+}
+
+interface BallPrediction {
+  currentPosition: { x: number; y: number };
+  predictedPath: TrajectoryPoint[];
+  landingPosition: { x: number; y: number } | null;
+  timeToStop: number;
+  willExitField: boolean;
+}
+
+interface PlayerPrediction {
+  playerId: string;
+  predictedPath: TrajectoryPoint[];
+  canInterceptBall: boolean;
+  interceptPoint: { x: number; y: number } | null;
+  timeToIntercept: number | null;
+}
+
 interface PlayerKnowledge {
   playerId: string;
   team: 'red' | 'blue';
@@ -57,6 +80,15 @@ interface PlayerKnowledge {
     losing: string;
     tied: string;
   };
+
+  // Trajectory predictions
+  ballPrediction: BallPrediction;
+  myTrajectory: TrajectoryPoint[];
+  teammatePredictions: PlayerPrediction[];
+  opponentPredictions: PlayerPrediction[];
+  canInterceptBall: boolean;
+  myInterceptPoint: { x: number; y: number } | null;
+  timeToInterceptBall: number | null;
 }
 
 interface PlayerPOVProps {
@@ -336,8 +368,17 @@ const FieldMarkings = () => {
   );
 };
 
+// POV Scene interface (doesn't need knowledge prop for rendering)
+interface POVSceneProps {
+  player: Player;
+  redTeam: Player[];
+  blueTeam: Player[];
+  ball: Ball;
+  isRed: boolean;
+}
+
 // POV Scene
-const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) => {
+const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: POVSceneProps) => {
   return (
     <>
       {/* Camera with auto-tracking */}
