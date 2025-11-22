@@ -126,6 +126,7 @@ interface TrajectoryPoint {
 }
 
 interface BallPrediction {
+  currentPosition: { x: number; y: number };
   predictedPath: TrajectoryPoint[];
   landingPosition: { x: number; y: number } | null;
   timeToStop: number;
