@@ -312,6 +312,8 @@ export default function TacticalFootball() {
   const [renderBall, setRenderBall] = useState<Ball>({ x: FIELD_WIDTH/2, y: FIELD_HEIGHT/2, vx: 0, vy: 0 });
   const [renderRed, setRenderRed] = useState<Player[]>([]);
   const [renderBlue, setRenderBlue] = useState<Player[]>([]);
+  // Track selected sectors (from device or UI). Multiple sectors can be active.
+  const [selectedSectors, setSelectedSectors] = useState<number[]>([]);
 
   const gameState = useRef({
     ball: { x: FIELD_WIDTH/2, y: FIELD_HEIGHT/2, vx: 0, vy: 0 },
@@ -547,14 +549,43 @@ export default function TacticalFootball() {
         }
     });
 
-    if (candidateId) {
-        lockedPlayersRef.current.set(candidateId, {
-            targetSector: sectorId,
-            timer: TACTICAL_LOCK_DURATION
-        });
-        setLockedPlayersUI(new Map(lockedPlayersRef.current));
+      if (candidateId) {
+      lockedPlayersRef.current.set(candidateId, {
+        targetSector: sectorId,
+        timer: TACTICAL_LOCK_DURATION
+      });
+      setLockedPlayersUI(new Map(lockedPlayersRef.current));
+      // Add this sector to the selected sectors when a lock is actually created
+      setSelectedSectors(prev => prev.includes(sectorId) ? prev : [...prev, sectorId]);
     }
-  }, []);
+    }, []);
+
+    // Device button listener: lock players when device buttons (0-8) are pressed
+    useEffect(() => {
+      const dev = mxRef.current;
+      if (!dev) return;
+
+      const handleKeyDown = (e: any) => {
+        const key = e && e.detail && typeof e.detail.key === 'number' ? e.detail.key : null;
+        if (key !== null && key >= 0 && key <= 8) {
+          // Only attempt to assign a player; do NOT pre-set selection here.
+          // Selection is set inside `assignPlayerToSector` only when a lock is actually created.
+          try { assignPlayerToSector(key); }
+          catch (err) { console.warn('assignPlayerToSector error', err); }
+        }
+      };
+
+      dev.addEventListener('keydown', handleKeyDown);
+      return () => { dev.removeEventListener('keydown', handleKeyDown); };
+    }, [assignPlayerToSector, deviceConnected]);
+
+    // Clear `selectedSectors` entries when no player is locked to them anymore
+    useEffect(() => {
+      if (!selectedSectors || selectedSectors.length === 0) return;
+      // Keep only sectors that still have active locks
+      const remaining = selectedSectors.filter(sec => Array.from(lockedPlayersRef.current.values()).some(l => l.targetSector === sec));
+      if (remaining.length !== selectedSectors.length) setSelectedSectors(remaining);
+    }, [lockedPlayersUI, selectedSectors]);
 
   const update = useCallback(() => {
     if (isPaused) { reqRef.current = requestAnimationFrame(update); return; }
@@ -824,7 +855,7 @@ export default function TacticalFootball() {
 
     // Device sync: throttle to ~10 FPS
     const now = performance.now();
-    if (mxRef.current && mxRef.current.device && now - lastDeviceUpdate.current > 100) {
+    if (mxRef.current && mxRef.current.device && now - lastDeviceUpdate.current > 50) {
       lastDeviceUpdate.current = now;
       renderDeviceSheet().catch((err: any) => console.warn('Device render error', err));
     }
@@ -898,6 +929,14 @@ export default function TacticalFootball() {
     const sectorCol = Math.min(COLS - 1, Math.max(0, Math.floor((sheetBallX - ORIGIN_X) / (sectorW + GAP))));
     const sectorRow = Math.min(ROWS - 1, Math.max(0, Math.floor((sheetBallY - ORIGIN_Y) / (sectorH + GAP))));
 
+    // Which sectors should be highlighted on the device:
+    // Only highlight sectors that were explicitly selected AND still have an active lock.
+    const highlightSet = new Set<number>();
+    (selectedSectors || []).forEach(sec => {
+      const stillLocked = Array.from(lockedPlayersRef.current.values()).some(l => l.targetSector === sec);
+      if (stillLocked) highlightSet.add(sec);
+    });
+
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const x = ORIGIN_X + c * (sectorW + GAP);
@@ -909,6 +948,15 @@ export default function TacticalFootball() {
         sctx.strokeStyle = 'rgba(255,255,255,0.06)';
         sctx.lineWidth = 2;
         sctx.strokeRect(x + 1, y + 1, sectorW - 2, sectorH - 2);
+
+        // Orange border if explicitly selected and still active
+        if (highlightSet.has(r * 3 + c)) {
+          sctx.save();
+          sctx.strokeStyle = '#f59e1b';
+          sctx.lineWidth = 6;
+          sctx.strokeRect(x + 3, y + 3, sectorW - 6, sectorH - 6);
+          sctx.restore();
+        }
 
         if (c === sectorCol && r === sectorRow) {
           // sctx.fillStyle = 'rgba(34,193,195,0.16)';
@@ -965,6 +1013,24 @@ export default function TacticalFootball() {
       sctx.strokeStyle = 'rgba(255,255,255,0.6)';
       sctx.arc(px, py, baseMarkerDiameter, 0, Math.PI * 2);
       sctx.stroke();
+
+      // Stronger amber ring for locked players so they stand out on the device
+      if (isLocked) {
+        sctx.save();
+        sctx.beginPath();
+        sctx.lineWidth = 3.5;
+        sctx.strokeStyle = '#f59e1b'; // amber-500
+        sctx.globalAlpha = 0.95;
+        sctx.arc(px, py, baseMarkerDiameter + 5, 0, Math.PI * 2);
+        sctx.stroke();
+
+        // Soft glow outer ring
+        sctx.beginPath();
+        sctx.fillStyle = 'rgba(245,158,11,0.12)';
+        sctx.arc(px, py, baseMarkerDiameter + 9, 0, Math.PI * 2);
+        sctx.fill();
+        sctx.restore();
+      }
     };
 
     // Draw red team
