@@ -165,7 +165,7 @@ const Goal = ({ isLeft }: { isLeft: boolean }) => {
         <meshStandardMaterial color="#ffffff" metalness={0.8} roughness={0.2} />
       </mesh>
       {/* Crossbar */}
-      <mesh position={[0, 2, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+      <mesh position={[0, 2, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.1, 0.1, goalHeight, 16]} />
         <meshStandardMaterial color="#ffffff" metalness={0.8} roughness={0.2} />
       </mesh>
