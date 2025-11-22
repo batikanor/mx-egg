@@ -566,8 +566,8 @@ export default function TacticalFootball() {
       {/* Header */}
       <div className="w-full max-w-3xl flex items-center justify-between mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 shadow-xl">
         <div className="flex items-center gap-4 w-1/3">
-            <div className="w-12 h-12 bg-blue-900/50 rounded-xl border border-blue-700 flex items-center justify-center"><Shield className="text-blue-400" size={24} /></div>
-            <div className="flex flex-col"><span className="text-[10px] text-blue-400 font-bold tracking-widest uppercase">Cpu United</span><span className="text-3xl font-black text-white leading-none">{score.blue}</span></div>
+            <div className="w-12 h-12 bg-red-900/50 rounded-xl border border-red-700 flex items-center justify-center"><Swords className="text-red-400" size={24} /></div>
+            <div className="flex flex-col"><span className="text-[10px] text-red-400 font-bold tracking-widest uppercase">Player FC</span><span className="text-3xl font-black text-white leading-none">{score.red}</span></div>
         </div>
         <div className="flex flex-col items-center w-1/3">
             <div className="bg-black/40 px-4 py-1 rounded-full border border-white/10 flex items-center gap-2">
@@ -576,8 +576,8 @@ export default function TacticalFootball() {
             </div>
         </div>
         <div className="flex items-center gap-4 w-1/3 justify-end">
-            <div className="flex flex-col items-end"><span className="text-[10px] text-red-400 font-bold tracking-widest uppercase">Player FC</span><span className="text-3xl font-black text-white leading-none">{score.red}</span></div>
-            <div className="w-12 h-12 bg-red-900/50 rounded-xl border border-red-700 flex items-center justify-center"><Swords className="text-red-400" size={24} /></div>
+            <div className="flex flex-col items-end"><span className="text-[10px] text-blue-400 font-bold tracking-widest uppercase">Cpu United</span><span className="text-3xl font-black text-white leading-none">{score.blue}</span></div>
+            <div className="w-12 h-12 bg-blue-900/50 rounded-xl border border-blue-700 flex items-center justify-center"><Shield className="text-blue-400" size={24} /></div>
         </div>
       </div>
 
