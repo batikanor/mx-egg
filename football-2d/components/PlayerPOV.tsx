@@ -138,34 +138,34 @@ const Stadium = () => {
 
   return (
     <group>
-      {/* Stadium walls/stands - all four sides with fans */}
+      {/* Stadium walls/stands - all four sides with fewer fans for performance */}
       {/* Left stand */}
       <mesh position={[-60, 8, 0]} receiveShadow castShadow>
         <boxGeometry args={[4, 16, 80]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
-      {generateFans([-58, 8, 0], 15, 80, 'horizontal')}
+      {generateFans([-58, 8, 0], 6, 25, 'horizontal')}
 
       {/* Right stand */}
       <mesh position={[60, 8, 0]} receiveShadow castShadow>
         <boxGeometry args={[4, 16, 80]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
-      {generateFans([58, 8, 0], 15, 80, 'horizontal')}
+      {generateFans([58, 8, 0], 6, 25, 'horizontal')}
 
       {/* Top stand */}
       <mesh position={[0, 8, -40]} receiveShadow castShadow>
         <boxGeometry args={[120, 16, 4]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
-      {generateFans([0, 8, -38], 15, 100, 'vertical')}
+      {generateFans([0, 8, -38], 6, 30, 'vertical')}
 
       {/* Bottom stand */}
       <mesh position={[0, 8, 40]} receiveShadow castShadow>
         <boxGeometry args={[120, 16, 4]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
-      {generateFans([0, 8, 38], 15, 100, 'vertical')}
+      {generateFans([0, 8, 38], 6, 30, 'vertical')}
 
       {/* Floodlights with brighter illumination */}
       {[
@@ -251,23 +251,24 @@ const FieldMarkings = () => {
 
       {/* Penalty boxes - FIFA standard 16.5m x 40.32m */}
       {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => {
-        const penaltyBoxDepth = 1.65; // 16.5m / 10
-        const penaltyBoxWidth = 4.032; // 40.32m / 10
-        const goalBoxDepth = 0.55; // 5.5m / 10
-        const goalBoxWidth = 1.832; // 18.32m / 10
-        const penaltySpotDistance = 1.1; // 11m / 10
+        // FIFA standard dimensions in meters, converted to units (divide by 10 for our scale)
+        const penaltyBoxDepth = 16.5 / 10; // 16.5m from goal line
+        const penaltyBoxWidth = 40.32 / 10; // 40.32m wide
+        const goalBoxDepth = 5.5 / 10; // 5.5m from goal line (6-yard box)
+        const goalBoxWidth = 18.32 / 10; // 18.32m wide (20 yards)
+        const penaltySpotDistance = 11 / 10; // 11m from goal line (12 yards)
 
         return (
           <group key={idx}>
             {/* Penalty box outline */}
             <lineSegments position={[idx === 0 ? x + penaltyBoxDepth / 2 : x - penaltyBoxDepth / 2, 0, 0]}>
-              <edgesGeometry args={[new THREE.BoxGeometry(penaltyBoxDepth, 0, penaltyBoxWidth * 10)]} />
+              <edgesGeometry args={[new THREE.BoxGeometry(penaltyBoxDepth, 0, penaltyBoxWidth)]} />
               <lineBasicMaterial color="#ffffff" linewidth={2} />
             </lineSegments>
 
-            {/* Goal box */}
+            {/* Goal box (6-yard box) */}
             <lineSegments position={[idx === 0 ? x + goalBoxDepth / 2 : x - goalBoxDepth / 2, 0, 0]}>
-              <edgesGeometry args={[new THREE.BoxGeometry(goalBoxDepth, 0, goalBoxWidth * 10)]} />
+              <edgesGeometry args={[new THREE.BoxGeometry(goalBoxDepth, 0, goalBoxWidth)]} />
               <lineBasicMaterial color="#ffffff" linewidth={2} />
             </lineSegments>
 
@@ -277,12 +278,12 @@ const FieldMarkings = () => {
               <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
             </mesh>
 
-            {/* Penalty arc */}
+            {/* Penalty arc - only the part outside the box */}
             <mesh
               rotation={[-Math.PI / 2, 0, idx === 0 ? 0 : Math.PI]}
               position={[idx === 0 ? x + penaltySpotDistance : x - penaltySpotDistance, 0, 0]}
             >
-              <ringGeometry args={[0.915, 0.935, 64, 1, Math.PI * 0.37, Math.PI * 0.26]} />
+              <ringGeometry args={[9.15 / 10, 9.35 / 10, 64, 1, Math.PI * 0.37, Math.PI * 0.26]} />
               <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
             </mesh>
           </group>
