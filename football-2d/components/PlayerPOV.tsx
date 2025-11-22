@@ -761,12 +761,12 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
             </div>
 
             {/* AI Strategy Thoughts */}
-            {knowledge.strategyThoughts.length > 0 && (
-              <div className="border-t border-zinc-700 pt-3 mt-2">
-                <h5 className="text-xs font-bold text-zinc-400 uppercase mb-2 flex items-center gap-2">
-                  🤖 AI Strategy Thoughts
-                  <span className="text-[10px] text-zinc-600 font-normal">({knowledge.strategyThoughts.length} decisions)</span>
-                </h5>
+            <div className="border-t border-zinc-700 pt-3 mt-2">
+              <h5 className="text-xs font-bold text-zinc-400 uppercase mb-2 flex items-center gap-2">
+                🤖 AI Strategy Thoughts
+                <span className="text-[10px] text-zinc-600 font-normal">({knowledge.strategyThoughts.length} decisions)</span>
+              </h5>
+              {knowledge.strategyThoughts.length > 0 ? (
                 <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                   {knowledge.strategyThoughts.slice().reverse().map((thought, idx) => (
                     <div key={idx} className="bg-zinc-900/50 rounded p-3 border border-zinc-700/50">
@@ -792,8 +792,12 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-xs text-zinc-500 text-center py-4">
+                  Waiting for AI to make first decision... (updates every 5 seconds)
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

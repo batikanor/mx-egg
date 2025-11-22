@@ -947,10 +947,13 @@ export default function TacticalFootball() {
               reasoning: data.reasoning,
             };
 
+            const updatedThoughts = [...currentKnowledge.strategyThoughts, newThought];
+            console.log(`💭 Saving thought for ${randomPlayerId}. Total thoughts: ${updatedThoughts.length}`, newThought);
+
             updated.set(randomPlayerId, {
               ...currentKnowledge,
               myCurrentStrategy: data.selectedStrategy,
-              strategyThoughts: [...currentKnowledge.strategyThoughts, newThought],
+              strategyThoughts: updatedThoughts,
             });
 
             // Update teammate knowledge for other players on the same team
