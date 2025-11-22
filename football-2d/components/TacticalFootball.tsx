@@ -335,8 +335,14 @@ export default function TacticalFootball() {
   const lockedPlayersRef = useRef(new Map<string, LockInfo>());
   const msgTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reqRef = useRef<number | undefined>(undefined);
+  const playerKnowledgeRef = useRef(playerKnowledge);
   const screenshotTimer = useRef<number | null>(null);
   const currentCaptureIndex = useRef<number>(0);
+
+  // Keep the ref updated with current playerKnowledge
+  useEffect(() => {
+    playerKnowledgeRef.current = playerKnowledge;
+  }, [playerKnowledge]);
 
   useEffect(() => {
     resetMatch();
@@ -881,14 +887,25 @@ export default function TacticalFootball() {
   // AI Strategy Updates - every 5 seconds per player
   useEffect(() => {
     const allPlayerIds = [...renderRed, ...renderBlue].map(p => p.id);
-    if (allPlayerIds.length === 0) return;
+    if (allPlayerIds.length === 0) {
+      console.log('⚠️ AI Interval NOT started - no players yet');
+      return;
+    }
+
+    console.log(`✨ AI Strategy Interval started for ${allPlayerIds.length} players:`, allPlayerIds);
 
     const strategyUpdateInterval = setInterval(() => {
       // Pick a random player to update strategy
       const randomPlayerId = allPlayerIds[Math.floor(Math.random() * allPlayerIds.length)];
-      const knowledge = playerKnowledge.get(randomPlayerId);
+      // Use ref to get current state, not stale closure
+      const knowledge = playerKnowledgeRef.current.get(randomPlayerId);
 
-      if (!knowledge || knowledge.fovScreenshots.length === 0) return;
+      console.log(`🔍 AI Interval tick - Selected player: ${randomPlayerId}, Has knowledge: ${!!knowledge}, FOV count: ${knowledge?.fovScreenshots.length || 0}`);
+
+      if (!knowledge || knowledge.fovScreenshots.length === 0) {
+        console.log(`⏭️ Skipping ${randomPlayerId} - waiting for FOV screenshots`);
+        return;
+      }
 
       // Fire and forget - don't await, don't block the game
       (async () => {
@@ -930,7 +947,7 @@ export default function TacticalFootball() {
           const data = await response.json();
           console.log(`✅ AI Strategy Decision received (${elapsed}s):`, {
             player: randomPlayerId,
-            previousStrategy: playerKnowledge.get(randomPlayerId)?.myCurrentStrategy,
+            previousStrategy: playerKnowledgeRef.current.get(randomPlayerId)?.myCurrentStrategy,
             selectedStrategy: data.selectedStrategy,
             reasoning: data.reasoning
           });
