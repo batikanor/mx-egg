@@ -65,17 +65,13 @@ Respond in JSON format:
   "reasoning": "brief explanation of why you made this choice (2-3 sentences)"
 }`
       },
-      // Add the most recent FOV screenshot if available
-      ...(playerKnowledge.fovScreenshots.length > 0
-        ? [
-            {
-              type: 'image_url',
-              image_url: {
-                url: playerKnowledge.fovScreenshots[playerKnowledge.fovScreenshots.length - 1],
-              },
-            },
-          ]
-        : []),
+      // Add all FOV screenshots (up to 10, most recent first)
+      ...playerKnowledge.fovScreenshots.slice().reverse().map((screenshot) => ({
+        type: 'image_url' as const,
+        image_url: {
+          url: screenshot,
+        },
+      })),
     ];
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
