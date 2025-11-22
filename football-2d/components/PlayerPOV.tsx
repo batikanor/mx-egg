@@ -77,7 +77,7 @@ const SimpleBall3D = ({ ball }: { ball: Ball }) => {
 
 // POV Scene
 const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) => {
-  const [px, py, pz] = to3D(player.x, player.y, 1.5); // Eye level
+  const [px, py, pz] = to3D(player.x, player.y, 1.8); // Slightly above eye level for better view
 
   // Calculate look direction (towards the ball)
   const [bx, by, bz] = to3D(ball.x, ball.y, 0.4);

@@ -86,7 +86,7 @@ interface LockInfo {
 
 // --- Components ---
 
-const MainField = React.memo(({ redTeam, blueTeam, ball, lockedPlayers, matchState, announcerMsg, onPlayerClick, selectedPlayer }: {
+const MainField = ({ redTeam, blueTeam, ball, lockedPlayers, matchState, announcerMsg, onPlayerClick, selectedPlayer }: {
   redTeam: Player[];
   blueTeam: Player[];
   ball: Ball;
@@ -161,9 +161,7 @@ const MainField = React.memo(({ redTeam, blueTeam, ball, lockedPlayers, matchSta
         </div>
       )}
   </div>
-));
-
-MainField.displayName = 'MainField';
+);
 
 const SectorKey = React.memo(({ sector, onAssign, redTeam, blueTeam, ball, lockedPlayers }: {
   sector: { id: number; x: number; y: number; label: string };
