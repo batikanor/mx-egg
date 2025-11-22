@@ -909,11 +909,23 @@ export default function TacticalFootball() {
         });
 
         if (!response.ok) {
-          console.error('Strategy selection failed:', await response.text());
+          const errorText = await response.text();
+          console.error('❌ AI STRATEGY SELECTION FAILED:', {
+            player: randomPlayerId,
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
           return;
         }
 
         const data = await response.json();
+        console.log('✅ AI Strategy Decision:', {
+          player: randomPlayerId,
+          previousStrategy: playerKnowledge.get(randomPlayerId)?.myCurrentStrategy,
+          selectedStrategy: data.selectedStrategy,
+          reasoning: data.reasoning
+        });
 
         // Update player knowledge with new strategy and thought
         setPlayerKnowledge(prev => {
