@@ -219,7 +219,7 @@ export default function TacticalFootball() {
   const kickCooldowns = useRef(new Map<string, number>());
   const lockedPlayersRef = useRef(new Map<string, LockInfo>());
   const msgTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reqRef = useRef<number>();
+  const reqRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     resetMatch();
