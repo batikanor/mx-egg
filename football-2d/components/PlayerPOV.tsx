@@ -107,29 +107,65 @@ const CameraController = ({ player, ball }: { player: Player; ball: Ball }) => {
 
 // Stadium features component
 const Stadium = () => {
+  // Generate random fans in stands
+  const generateFans = (standPosition: [number, number, number], rows: number, cols: number, direction: 'horizontal' | 'vertical') => {
+    const fans = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const colorChoice = Math.random();
+        const color = colorChoice < 0.4 ? '#ef4444' : colorChoice < 0.8 ? '#3b82f6' : '#ffffff';
+
+        let x = standPosition[0];
+        let y = standPosition[1] + row * 0.8 - (rows * 0.4);
+        let z = standPosition[2];
+
+        if (direction === 'horizontal') {
+          z += (col - cols / 2) * 0.8 + Math.random() * 0.3;
+        } else {
+          x += (col - cols / 2) * 0.8 + Math.random() * 0.3;
+        }
+
+        fans.push(
+          <mesh key={`fan-${row}-${col}`} position={[x, y, z]} castShadow>
+            <sphereGeometry args={[0.15, 8, 8]} />
+            <meshStandardMaterial color={color} roughness={0.6} emissive={color} emissiveIntensity={0.2} />
+          </mesh>
+        );
+      }
+    }
+    return fans;
+  };
+
   return (
     <group>
-      {/* Stadium walls/stands - all four sides with gradient effect */}
+      {/* Stadium walls/stands - all four sides with fans */}
       {/* Left stand */}
       <mesh position={[-60, 8, 0]} receiveShadow castShadow>
         <boxGeometry args={[4, 16, 80]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
+      {generateFans([-58, 8, 0], 15, 80, 'horizontal')}
+
       {/* Right stand */}
       <mesh position={[60, 8, 0]} receiveShadow castShadow>
         <boxGeometry args={[4, 16, 80]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
+      {generateFans([58, 8, 0], 15, 80, 'horizontal')}
+
       {/* Top stand */}
       <mesh position={[0, 8, -40]} receiveShadow castShadow>
         <boxGeometry args={[120, 16, 4]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
+      {generateFans([0, 8, -38], 15, 100, 'vertical')}
+
       {/* Bottom stand */}
       <mesh position={[0, 8, 40]} receiveShadow castShadow>
         <boxGeometry args={[120, 16, 4]} />
         <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
+      {generateFans([0, 8, 38], 15, 100, 'vertical')}
 
       {/* Floodlights with brighter illumination */}
       {[
@@ -149,6 +185,12 @@ const Stadium = () => {
           <pointLight position={[0, 5, 0]} intensity={200} distance={100} color="#ffffff" />
         </group>
       ))}
+
+      {/* Stand lighting to illuminate fans */}
+      <pointLight position={[-60, 12, 0]} intensity={400} distance={50} color="#ffffff" />
+      <pointLight position={[60, 12, 0]} intensity={400} distance={50} color="#ffffff" />
+      <pointLight position={[0, 12, -40]} intensity={400} distance={50} color="#ffffff" />
+      <pointLight position={[0, 12, 40]} intensity={400} distance={50} color="#ffffff" />
 
       {/* Advertising boards with emissive glow */}
       {[-52, 52].map((x, idx) => (
@@ -207,31 +249,45 @@ const FieldMarkings = () => {
         <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
       </mesh>
 
-      {/* Penalty boxes */}
-      {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => (
-        <group key={idx}>
-          {/* Penalty box outline */}
-          <lineSegments position={[x, 0, 0]}>
-            <edgesGeometry args={[new THREE.BoxGeometry(13, 0, 26)]} />
-            <lineBasicMaterial color="#ffffff" linewidth={2} />
-          </lineSegments>
-          {/* Goal box */}
-          <lineSegments position={[x, 0, 0]}>
-            <edgesGeometry args={[new THREE.BoxGeometry(5.5, 0, 11)]} />
-            <lineBasicMaterial color="#ffffff" linewidth={2} />
-          </lineSegments>
-          {/* Penalty spot */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x + (idx === 0 ? 6.5 : -6.5), 0, 0]}>
-            <circleGeometry args={[0.2, 32]} />
-            <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
-          </mesh>
-          {/* Penalty arc */}
-          <mesh rotation={[-Math.PI / 2, 0, idx === 0 ? 0 : Math.PI]} position={[x + (idx === 0 ? 6.5 : -6.5), 0, 0]}>
-            <ringGeometry args={[9.15, 9.35, 32, 1, Math.PI * 0.37, Math.PI * 0.26]} />
-            <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
-          </mesh>
-        </group>
-      ))}
+      {/* Penalty boxes - FIFA standard 16.5m x 40.32m */}
+      {[-FIELD_WIDTH / 20, FIELD_WIDTH / 20].map((x, idx) => {
+        const penaltyBoxDepth = 1.65; // 16.5m / 10
+        const penaltyBoxWidth = 4.032; // 40.32m / 10
+        const goalBoxDepth = 0.55; // 5.5m / 10
+        const goalBoxWidth = 1.832; // 18.32m / 10
+        const penaltySpotDistance = 1.1; // 11m / 10
+
+        return (
+          <group key={idx}>
+            {/* Penalty box outline */}
+            <lineSegments position={[idx === 0 ? x + penaltyBoxDepth / 2 : x - penaltyBoxDepth / 2, 0, 0]}>
+              <edgesGeometry args={[new THREE.BoxGeometry(penaltyBoxDepth, 0, penaltyBoxWidth * 10)]} />
+              <lineBasicMaterial color="#ffffff" linewidth={2} />
+            </lineSegments>
+
+            {/* Goal box */}
+            <lineSegments position={[idx === 0 ? x + goalBoxDepth / 2 : x - goalBoxDepth / 2, 0, 0]}>
+              <edgesGeometry args={[new THREE.BoxGeometry(goalBoxDepth, 0, goalBoxWidth * 10)]} />
+              <lineBasicMaterial color="#ffffff" linewidth={2} />
+            </lineSegments>
+
+            {/* Penalty spot */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[idx === 0 ? x + penaltySpotDistance : x - penaltySpotDistance, 0, 0]}>
+              <circleGeometry args={[0.2, 32]} />
+              <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+            </mesh>
+
+            {/* Penalty arc */}
+            <mesh
+              rotation={[-Math.PI / 2, 0, idx === 0 ? 0 : Math.PI]}
+              position={[idx === 0 ? x + penaltySpotDistance : x - penaltySpotDistance, 0, 0]}
+            >
+              <ringGeometry args={[0.915, 0.935, 64, 1, Math.PI * 0.37, Math.PI * 0.26]} />
+              <meshBasicMaterial color="#ffffff" opacity={0.9} transparent />
+            </mesh>
+          </group>
+        );
+      })}
 
       {/* Corner arcs */}
       {[
