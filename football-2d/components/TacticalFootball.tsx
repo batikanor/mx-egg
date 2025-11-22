@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import StrategyPanel from './StrategyPanel';
+import { predictBallTrajectory, predictPlayerTrajectory, analyzeInterception } from '../utils/trajectoryPredictor';
 
 const Field3D = dynamic(() => import('./Field3D'), { ssr: false });
 const PlayerPOV = dynamic(() => import('./PlayerPOV'), { ssr: false });
@@ -117,6 +118,28 @@ interface LockInfo {
   timer: number;
 }
 
+interface TrajectoryPoint {
+  x: number;
+  y: number;
+  t: number;
+  velocity?: { vx: number; vy: number };
+}
+
+interface BallPrediction {
+  predictedPath: TrajectoryPoint[];
+  landingPosition: { x: number; y: number } | null;
+  timeToStop: number;
+  willExitField: boolean;
+}
+
+interface PlayerPrediction {
+  playerId: string;
+  predictedPath: TrajectoryPoint[];
+  canInterceptBall: boolean;
+  interceptPoint: { x: number; y: number } | null;
+  timeToIntercept: number | null;
+}
+
 interface PlayerKnowledge {
   playerId: string;
   team: 'red' | 'blue';
@@ -147,6 +170,15 @@ interface PlayerKnowledge {
     losing: string;
     tied: string;
   };
+
+  // Trajectory predictions
+  ballPrediction: BallPrediction;
+  myTrajectory: TrajectoryPoint[];
+  teammatePredictions: PlayerPrediction[];
+  opponentPredictions: PlayerPrediction[];
+  canInterceptBall: boolean;
+  myInterceptPoint: { x: number; y: number } | null;
+  timeToInterceptBall: number | null;
 }
 
 // --- Components ---
@@ -335,6 +367,15 @@ export default function TacticalFootball() {
         const isRed = player.id.startsWith('r');
         const team = isRed ? 'red' : 'blue';
         const teammates = allPlayers.filter(p => p.id !== player.id && p.id.startsWith(player.id[0]));
+        const opponents = allPlayers.filter(p => !p.id.startsWith(player.id[0]));
+
+        // Initial trajectory predictions (will be updated every frame)
+        const initialBallPrediction = predictBallTrajectory(
+          gameState.current.ball.x,
+          gameState.current.ball.y,
+          gameState.current.ball.vx,
+          gameState.current.ball.vy
+        );
 
         newKnowledge.set(player.id, {
           playerId: player.id,
@@ -357,7 +398,28 @@ export default function TacticalFootball() {
           // Game knowledge (shared by all players)
           roleDescriptions: GAME_KNOWLEDGE.roleDescriptions,
           strategyGuidelines: GAME_KNOWLEDGE.strategyGuidelines,
-          whenToUseStrategies: GAME_KNOWLEDGE.whenToUseStrategies
+          whenToUseStrategies: GAME_KNOWLEDGE.whenToUseStrategies,
+
+          // Trajectory predictions (initial state)
+          ballPrediction: initialBallPrediction,
+          myTrajectory: predictPlayerTrajectory(player.x, player.y, player.vx, player.vy),
+          teammatePredictions: teammates.map(t => ({
+            playerId: t.id,
+            predictedPath: predictPlayerTrajectory(t.x, t.y, t.vx, t.vy),
+            canInterceptBall: false,
+            interceptPoint: null,
+            timeToIntercept: null
+          })),
+          opponentPredictions: opponents.map(o => ({
+            playerId: o.id,
+            predictedPath: predictPlayerTrajectory(o.x, o.y, o.vx, o.vy),
+            canInterceptBall: false,
+            interceptPoint: null,
+            timeToIntercept: null
+          })),
+          canInterceptBall: false,
+          myInterceptPoint: null,
+          timeToInterceptBall: null
         });
       });
       setPlayerKnowledge(newKnowledge);
@@ -662,6 +724,73 @@ export default function TacticalFootball() {
 
     processTeam(state.red, true, state.blue);
     processTeam(state.blue, false, state.red);
+
+    // Update trajectory predictions for all players
+    const allPlayers = [...state.red, ...state.blue];
+    const currentBallPrediction = predictBallTrajectory(b.x, b.y, b.vx, b.vy);
+
+    setPlayerKnowledge(prev => {
+      const updated = new Map(prev);
+
+      allPlayers.forEach(player => {
+        const knowledge = updated.get(player.id);
+        if (!knowledge) return;
+
+        const teammates = allPlayers.filter(p => p.id !== player.id && p.id.startsWith(player.id[0]));
+        const opponents = allPlayers.filter(p => !p.id.startsWith(player.id[0]));
+
+        // Calculate player's own trajectory
+        const myTrajectory = predictPlayerTrajectory(player.x, player.y, player.vx, player.vy);
+
+        // Analyze if this player can intercept the ball
+        const interceptionAnalysis = analyzeInterception(
+          player.x,
+          player.y,
+          5.0, // Max player speed
+          currentBallPrediction
+        );
+
+        // Predict teammate trajectories and interception capabilities
+        const teammatePredictions = teammates.map(t => {
+          const trajectory = predictPlayerTrajectory(t.x, t.y, t.vx, t.vy);
+          const intercept = analyzeInterception(t.x, t.y, 5.0, currentBallPrediction);
+          return {
+            playerId: t.id,
+            predictedPath: trajectory,
+            canInterceptBall: intercept.isPossible,
+            interceptPoint: intercept.interceptPoint,
+            timeToIntercept: intercept.timeToReach
+          };
+        });
+
+        // Predict opponent trajectories and interception capabilities
+        const opponentPredictions = opponents.map(o => {
+          const trajectory = predictPlayerTrajectory(o.x, o.y, o.vx, o.vy);
+          const intercept = analyzeInterception(o.x, o.y, 4.5, currentBallPrediction); // Slightly slower
+          return {
+            playerId: o.id,
+            predictedPath: trajectory,
+            canInterceptBall: intercept.isPossible,
+            interceptPoint: intercept.interceptPoint,
+            timeToIntercept: intercept.timeToReach
+          };
+        });
+
+        updated.set(player.id, {
+          ...knowledge,
+          currentScore: { red: score.red, blue: score.blue },
+          ballPrediction: currentBallPrediction,
+          myTrajectory,
+          teammatePredictions,
+          opponentPredictions,
+          canInterceptBall: interceptionAnalysis.isPossible,
+          myInterceptPoint: interceptionAnalysis.interceptPoint,
+          timeToInterceptBall: interceptionAnalysis.timeToReach
+        });
+      });
+
+      return updated;
+    });
 
     setRenderBall({...b});
     setRenderRed([...state.red]);

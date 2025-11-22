@@ -543,6 +543,94 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
               </div>
             </div>
 
+            {/* Trajectory Predictions */}
+            <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/30 rounded p-3 border border-purple-700/50">
+              <span className="text-[10px] text-purple-300 uppercase block mb-2 flex items-center gap-1">
+                🎯 Trajectory Predictions
+              </span>
+
+              {/* Ball Prediction */}
+              <div className="bg-black/30 rounded p-2 mb-2">
+                <span className="text-[10px] text-zinc-400 block mb-1">⚽ Ball Trajectory</span>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-zinc-500">Landing:</span>
+                    <span className="text-white ml-1 font-mono">
+                      ({knowledge.ballPrediction.landingPosition?.x.toFixed(0) || 'N/A'},
+                      {knowledge.ballPrediction.landingPosition?.y.toFixed(0) || 'N/A'})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500">Time to Stop:</span>
+                    <span className="text-amber-400 ml-1 font-mono">
+                      {knowledge.ballPrediction.timeToStop.toFixed(1)}s
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* My Interception */}
+              <div className={`rounded p-2 mb-2 ${knowledge.canInterceptBall ? 'bg-green-900/40 border border-green-700/50' : 'bg-zinc-900/40'}`}>
+                <span className="text-[10px] text-zinc-400 block mb-1">
+                  {knowledge.canInterceptBall ? '✅ Can Intercept Ball' : '❌ Cannot Intercept'}
+                </span>
+                {knowledge.canInterceptBall && knowledge.myInterceptPoint && (
+                  <div className="text-[11px] space-y-0.5">
+                    <div>
+                      <span className="text-zinc-500">Intercept Point:</span>
+                      <span className="text-green-400 ml-1 font-mono">
+                        ({knowledge.myInterceptPoint.x.toFixed(0)}, {knowledge.myInterceptPoint.y.toFixed(0)})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500">Time to Reach:</span>
+                      <span className="text-green-400 ml-1 font-mono">
+                        {knowledge.timeToInterceptBall?.toFixed(2)}s
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Teammate Interception Status */}
+              <div className="bg-black/30 rounded p-2 mb-2">
+                <span className="text-[10px] text-zinc-400 block mb-1">👥 Teammate Interceptions</span>
+                <div className="space-y-1">
+                  {knowledge.teammatePredictions.map((t, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-500">P{t.playerId.replace(/[rb]/, '')}</span>
+                      <span className={t.canInterceptBall ? 'text-green-400' : 'text-zinc-600'}>
+                        {t.canInterceptBall ? `✓ ${t.timeToIntercept?.toFixed(1)}s` : '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Opponent Interception Threats */}
+              <div className="bg-black/30 rounded p-2">
+                <span className="text-[10px] text-zinc-400 block mb-1">⚠️ Opponent Threats</span>
+                <div className="space-y-1">
+                  {knowledge.opponentPredictions.filter(o => o.canInterceptBall).length > 0 ? (
+                    knowledge.opponentPredictions
+                      .filter(o => o.canInterceptBall)
+                      .map((o, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[11px]">
+                          <span className="text-zinc-500">Opponent P{o.playerId.replace(/[rb]/, '')}</span>
+                          <span className="text-red-400">
+                            ⚠ {o.timeToIntercept?.toFixed(1)}s
+                          </span>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-[11px] text-zinc-600 text-center py-1">
+                      No immediate threats
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* FOV Screenshots */}
             <div>
               <div className="flex items-center justify-between mb-2">
