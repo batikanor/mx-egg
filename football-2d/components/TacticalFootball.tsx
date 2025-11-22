@@ -983,7 +983,7 @@ export default function TacticalFootball() {
     }, 5000); // Every 5 seconds
 
     return () => clearInterval(strategyUpdateInterval);
-  }, [renderRed.length, renderBlue.length, playerKnowledge]);
+  }, [renderRed.length, renderBlue.length]); // Don't include playerKnowledge to avoid resetting interval
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center py-8 px-4 font-sans text-zinc-300">
