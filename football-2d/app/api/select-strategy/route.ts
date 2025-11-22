@@ -66,7 +66,7 @@ Respond in JSON format:
 }`
       },
       // Add all FOV screenshots (up to 5, most recent first)
-      ...playerKnowledge.fovScreenshots.slice().reverse().map((screenshot) => ({
+      ...playerKnowledge.fovScreenshots.slice().reverse().map((screenshot: string) => ({
         type: 'image_url' as const,
         image_url: {
           url: screenshot,
