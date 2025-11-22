@@ -27,12 +27,21 @@ interface Ball {
   vy: number;
 }
 
+interface PlayerKnowledge {
+  playerId: string;
+  team: 'red' | 'blue';
+  currentScore: { red: number; blue: number };
+  fovScreenshots: string[];
+}
+
 interface PlayerPOVProps {
   player: Player;
   redTeam: Player[];
   blueTeam: Player[];
   ball: Ball;
   isRed: boolean;
+  knowledge: PlayerKnowledge;
+  onCanvasReady?: (playerId: string, canvas: HTMLCanvasElement) => void;
 }
 
 // Convert 2D coordinates to 3D
@@ -407,10 +416,22 @@ const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) =>
   );
 };
 
-export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) => {
+export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, onCanvasReady }: PlayerPOVProps) => {
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (canvasRef.current && onCanvasReady) {
+      const canvas = canvasRef.current.querySelector('canvas');
+      if (canvas) {
+        onCanvasReady(player.id, canvas);
+      }
+    }
+  }, [player.id, onCanvasReady]);
+
   return (
-    <div className="w-full bg-zinc-900/50 border-t-4 border-zinc-800 shadow-2xl p-4 flex justify-center">
+    <div className="w-full bg-zinc-900/50 border-t-4 border-zinc-800 shadow-2xl p-4 flex flex-col items-center">
       <div className="w-full max-w-[700px]">
+        {/* Live POV */}
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
             <div className={`w-4 h-4 ${isRed ? 'bg-red-600' : 'bg-blue-600'} rounded-full flex items-center justify-center text-[10px] text-white`}>
@@ -421,6 +442,7 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVP
           <span className="text-xs text-zinc-500">🎮 POV Camera</span>
         </div>
         <div
+          ref={canvasRef}
           className="relative rounded-lg overflow-hidden border-2 border-zinc-700 shadow-xl"
           style={{ width: '100%', aspectRatio: '16/9' }}
         >
@@ -431,6 +453,54 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVP
         <p className="text-xs text-zinc-500 mt-2 text-center">
           Click on a player on the field to switch views
         </p>
+
+        {/* Player Knowledge Base */}
+        <div className="mt-6 bg-zinc-800/50 rounded-lg border border-zinc-700 p-4">
+          <h4 className="text-sm font-bold text-zinc-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+            🧠 Player Knowledge Base
+          </h4>
+
+          <div className="space-y-3">
+            {/* Team and Score */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-400">Team:</span>
+                <span className={`text-xs font-bold ${knowledge.team === 'red' ? 'text-red-400' : 'text-blue-400'}`}>
+                  {knowledge.team === 'red' ? '🔴 Player FC' : '🔵 CPU United'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-zinc-400">Score:</span>
+                <span className="text-xs font-bold text-red-400">{knowledge.currentScore.red}</span>
+                <span className="text-xs text-zinc-500">-</span>
+                <span className="text-xs font-bold text-blue-400">{knowledge.currentScore.blue}</span>
+              </div>
+            </div>
+
+            {/* FOV Screenshots */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-zinc-400">Recent FOV Snapshots (last 10):</span>
+                <span className="text-xs text-zinc-500">{knowledge.fovScreenshots.length}/10</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {knowledge.fovScreenshots.map((screenshot, idx) => (
+                  <div key={idx} className="relative aspect-video rounded border border-zinc-600 overflow-hidden bg-zinc-900">
+                    <img src={screenshot} alt={`FOV ${idx + 1}`} className="w-full h-full object-cover" />
+                    <div className="absolute bottom-0 right-0 bg-black/70 text-[8px] text-zinc-400 px-1">
+                      {idx + 1}
+                    </div>
+                  </div>
+                ))}
+                {Array.from({ length: 10 - knowledge.fovScreenshots.length }).map((_, idx) => (
+                  <div key={`empty-${idx}`} className="aspect-video rounded border border-zinc-700 border-dashed bg-zinc-900/30 flex items-center justify-center">
+                    <span className="text-[10px] text-zinc-600">—</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

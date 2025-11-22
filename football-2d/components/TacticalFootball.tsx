@@ -84,6 +84,13 @@ interface LockInfo {
   timer: number;
 }
 
+interface PlayerKnowledge {
+  playerId: string;
+  team: 'red' | 'blue';
+  currentScore: { red: number; blue: number };
+  fovScreenshots: string[]; // Array of base64 image data URLs (last 10)
+}
+
 // --- Components ---
 
 const MainField = ({ redTeam, blueTeam, ball, lockedPlayers, matchState, announcerMsg }: {
@@ -222,11 +229,14 @@ export default function TacticalFootball() {
   const [isPaused, setIsPaused] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [playerKnowledge, setPlayerKnowledge] = useState<Map<string, PlayerKnowledge>>(new Map());
 
   const kickCooldowns = useRef(new Map<string, number>());
   const lockedPlayersRef = useRef(new Map<string, LockInfo>());
   const msgTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reqRef = useRef<number | undefined>(undefined);
+  const screenshotTimers = useRef<Map<string, number>>(new Map());
+  const povCanvasRefs = useRef<Map<string, HTMLCanvasElement | null>>(new Map());
 
   useEffect(() => {
     resetMatch();
@@ -257,6 +267,19 @@ export default function TacticalFootball() {
       lockedPlayersRef.current.clear();
       setLockedPlayersUI(new Map());
       kickCooldowns.current.clear();
+
+      // Initialize knowledge base for all players
+      const newKnowledge = new Map<string, PlayerKnowledge>();
+      [...gameState.current.red, ...gameState.current.blue].forEach(player => {
+        const isRed = player.id.startsWith('r');
+        newKnowledge.set(player.id, {
+          playerId: player.id,
+          team: isRed ? 'red' : 'blue',
+          currentScore: { red: 0, blue: 0 },
+          fovScreenshots: []
+        });
+      });
+      setPlayerKnowledge(newKnowledge);
   };
 
   // Helper to display messages without pausing
@@ -268,7 +291,21 @@ export default function TacticalFootball() {
 
   // Reset for Goals (Hard Reset)
   const triggerGoal = (team: string) => {
-    setScore(s => ({ ...s, [team.toLowerCase()]: s[team.toLowerCase() as 'red' | 'blue'] + 1 }));
+    const newScore = { ...score, [team.toLowerCase()]: score[team.toLowerCase() as 'red' | 'blue'] + 1 };
+    setScore(newScore);
+
+    // Update all players' knowledge with new score
+    setPlayerKnowledge(prev => {
+      const updated = new Map(prev);
+      updated.forEach((knowledge, playerId) => {
+        updated.set(playerId, {
+          ...knowledge,
+          currentScore: newScore
+        });
+      });
+      return updated;
+    });
+
     gameState.current.matchState = STATE.RESETTING;
     setAnnouncerMsg(`${team} GOAL!`);
 
@@ -562,6 +599,55 @@ export default function TacticalFootball() {
     };
   }, [update]);
 
+  // Handle canvas ready and setup screenshot capture
+  const handleCanvasReady = useCallback((playerId: string, canvas: HTMLCanvasElement) => {
+    povCanvasRefs.current.set(playerId, canvas);
+
+    // Clear existing timer if any
+    const existingTimer = screenshotTimers.current.get(playerId);
+    if (existingTimer) {
+      clearInterval(existingTimer);
+    }
+
+    // Setup 1-second interval screenshot capture
+    const timer = setInterval(() => {
+      if (!canvas) return;
+
+      try {
+        const screenshot = canvas.toDataURL('image/jpeg', 0.7);
+
+        setPlayerKnowledge(prev => {
+          const updated = new Map(prev);
+          const knowledge = updated.get(playerId);
+          if (knowledge) {
+            const newScreenshots = [...knowledge.fovScreenshots, screenshot];
+            // Keep only last 10
+            if (newScreenshots.length > 10) {
+              newScreenshots.shift();
+            }
+            updated.set(playerId, {
+              ...knowledge,
+              fovScreenshots: newScreenshots
+            });
+          }
+          return updated;
+        });
+      } catch (error) {
+        console.error('Failed to capture screenshot:', error);
+      }
+    }, 1000); // 1 second interval
+
+    screenshotTimers.current.set(playerId, timer as unknown as number);
+  }, []);
+
+  // Cleanup screenshot timers on unmount or player change
+  useEffect(() => {
+    return () => {
+      screenshotTimers.current.forEach(timer => clearInterval(timer));
+      screenshotTimers.current.clear();
+    };
+  }, [selectedPlayer]);
+
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center py-8 px-4 font-sans text-zinc-300">
       {/* Header */}
@@ -639,13 +725,16 @@ export default function TacticalFootball() {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === selectedPlayer);
         const isRed = selectedPlayer.startsWith('r');
-        return player ? (
+        const knowledge = playerKnowledge.get(selectedPlayer);
+        return player && knowledge ? (
           <PlayerPOV
             player={player}
             redTeam={renderRed}
             blueTeam={renderBlue}
             ball={renderBall}
             isRed={isRed}
+            knowledge={knowledge}
+            onCanvasReady={handleCanvasReady}
           />
         ) : null;
       })()}
