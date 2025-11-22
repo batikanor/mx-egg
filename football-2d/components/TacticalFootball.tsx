@@ -180,6 +180,14 @@ interface PlayerKnowledge {
   canInterceptBall: boolean;
   myInterceptPoint: { x: number; y: number } | null;
   timeToInterceptBall: number | null;
+
+  // AI Strategy Decisions
+  strategyThoughts: Array<{
+    timestamp: number;
+    previousStrategy: string;
+    selectedStrategy: string;
+    reasoning: string;
+  }>;
 }
 
 // --- Components ---
@@ -420,7 +428,10 @@ export default function TacticalFootball() {
           })),
           canInterceptBall: false,
           myInterceptPoint: null,
-          timeToInterceptBall: null
+          timeToInterceptBall: null,
+
+          // AI Strategy Decisions (initially empty)
+          strategyThoughts: []
         });
       });
       setPlayerKnowledge(newKnowledge);
@@ -866,6 +877,88 @@ export default function TacticalFootball() {
       }
     };
   }, [renderRed.length, renderBlue.length]);
+
+  // AI Strategy Updates - every 5 seconds per player
+  useEffect(() => {
+    const allPlayerIds = [...renderRed, ...renderBlue].map(p => p.id);
+    if (allPlayerIds.length === 0) return;
+
+    const strategyUpdateInterval = setInterval(async () => {
+      // Pick a random player to update strategy
+      const randomPlayerId = allPlayerIds[Math.floor(Math.random() * allPlayerIds.length)];
+      const knowledge = playerKnowledge.get(randomPlayerId);
+
+      if (!knowledge || knowledge.fovScreenshots.length === 0) return;
+
+      try {
+        // Get all available strategies
+        const allStrategies = [
+          ...GAME_KNOWLEDGE.strategyGuidelines.offensive,
+          ...GAME_KNOWLEDGE.strategyGuidelines.defensive,
+          ...GAME_KNOWLEDGE.strategyGuidelines.balanced,
+        ];
+
+        // Call AI API
+        const response = await fetch('/api/select-strategy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerKnowledge: knowledge,
+            availableStrategies: allStrategies,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Strategy selection failed:', await response.text());
+          return;
+        }
+
+        const data = await response.json();
+
+        // Update player knowledge with new strategy and thought
+        setPlayerKnowledge(prev => {
+          const updated = new Map(prev);
+          const currentKnowledge = updated.get(randomPlayerId);
+          if (currentKnowledge) {
+            const newThought = {
+              timestamp: data.timestamp,
+              previousStrategy: currentKnowledge.myCurrentStrategy,
+              selectedStrategy: data.selectedStrategy,
+              reasoning: data.reasoning,
+            };
+
+            updated.set(randomPlayerId, {
+              ...currentKnowledge,
+              myCurrentStrategy: data.selectedStrategy,
+              strategyThoughts: [...currentKnowledge.strategyThoughts, newThought],
+            });
+
+            // Update teammate knowledge for other players on the same team
+            const isRed = randomPlayerId.startsWith('r');
+            allPlayerIds.forEach(pid => {
+              if (pid !== randomPlayerId && pid.startsWith(randomPlayerId[0])) {
+                const teammateKnowledge = updated.get(pid);
+                if (teammateKnowledge) {
+                  const updatedTeammateStrategies = teammateKnowledge.teammateStrategies.map(ts =>
+                    ts.playerId === randomPlayerId ? { ...ts, strategy: data.selectedStrategy } : ts
+                  );
+                  updated.set(pid, {
+                    ...teammateKnowledge,
+                    teammateStrategies: updatedTeammateStrategies,
+                  });
+                }
+              }
+            });
+          }
+          return updated;
+        });
+      } catch (error) {
+        console.error('Error updating strategy for', randomPlayerId, ':', error);
+      }
+    }, 5000); // Every 5 seconds
+
+    return () => clearInterval(strategyUpdateInterval);
+  }, [renderRed.length, renderBlue.length, playerKnowledge]);
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center py-8 px-4 font-sans text-zinc-300">

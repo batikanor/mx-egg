@@ -89,6 +89,14 @@ interface PlayerKnowledge {
   canInterceptBall: boolean;
   myInterceptPoint: { x: number; y: number } | null;
   timeToInterceptBall: number | null;
+
+  // AI Strategy Decisions
+  strategyThoughts: Array<{
+    timestamp: number;
+    previousStrategy: string;
+    selectedStrategy: string;
+    reasoning: string;
+  }>;
 }
 
 interface PlayerPOVProps {
@@ -751,6 +759,41 @@ export const PlayerPOV = ({ player, redTeam, blueTeam, ball, isRed, knowledge, o
                 </div>
               </details>
             </div>
+
+            {/* AI Strategy Thoughts */}
+            {knowledge.strategyThoughts.length > 0 && (
+              <div className="border-t border-zinc-700 pt-3 mt-2">
+                <h5 className="text-xs font-bold text-zinc-400 uppercase mb-2 flex items-center gap-2">
+                  🤖 AI Strategy Thoughts
+                  <span className="text-[10px] text-zinc-600 font-normal">({knowledge.strategyThoughts.length} decisions)</span>
+                </h5>
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                  {knowledge.strategyThoughts.slice().reverse().map((thought, idx) => (
+                    <div key={idx} className="bg-zinc-900/50 rounded p-3 border border-zinc-700/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {thought.selectedStrategy !== thought.previousStrategy ? (
+                            <>
+                              <span className="text-[10px] text-zinc-500 line-through">{thought.previousStrategy}</span>
+                              <span className="text-[10px] text-zinc-500">→</span>
+                              <span className="text-[11px] font-bold text-emerald-400">{thought.selectedStrategy}</span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-bold text-blue-400">Kept: {thought.selectedStrategy}</span>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-zinc-600">
+                          {new Date(thought.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        {thought.reasoning}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
