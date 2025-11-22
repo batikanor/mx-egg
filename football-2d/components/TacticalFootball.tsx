@@ -7,8 +7,13 @@ import {
   SlidersHorizontal,
   Play,
   Pause,
-  FastForward
+  FastForward,
+  Box,
+  SquareDashedBottom
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const Field3D = dynamic(() => import('./Field3D'), { ssr: false });
 
 // --- Constants ---
 const FIELD_WIDTH = 1000;
@@ -215,6 +220,7 @@ export default function TacticalFootball() {
   const [score, setScore] = useState({ red: 0, blue: 0 });
   const [simSpeed, setSimSpeed] = useState(0.6);
   const [isPaused, setIsPaused] = useState(false);
+  const [is3DMode, setIs3DMode] = useState(false);
 
   const kickCooldowns = useRef(new Map<string, number>());
   const lockedPlayersRef = useRef(new Map<string, LockInfo>());
@@ -582,12 +588,23 @@ export default function TacticalFootball() {
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Speed: {simSpeed.toFixed(1)}x</span>
               <input type="range" min="0.1" max="1.5" step="0.1" value={simSpeed} onChange={(e) => setSimSpeed(parseFloat(e.target.value))} className="w-20 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
           </div>
+          <button
+            onClick={() => setIs3DMode(!is3DMode)}
+            className={`p-1.5 rounded-md transition-all ${is3DMode ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'}`}
+            title={is3DMode ? "Switch to 2D View" : "Switch to 3D View"}
+          >
+            {is3DMode ? <Box size={16} /> : <SquareDashedBottom size={16} />}
+          </button>
           <button onClick={() => setIsPaused(!isPaused)} className="p-1.5 bg-zinc-800 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
             {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
           </button>
       </div>
 
-      <MainField redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} matchState={gameState.current.matchState} announcerMsg={announcerMsg} />
+      {is3DMode ? (
+        <Field3D redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} announcerMsg={announcerMsg} />
+      ) : (
+        <MainField redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} matchState={gameState.current.matchState} announcerMsg={announcerMsg} />
+      )}
 
       <div className="flex flex-col items-center gap-4">
         <div className="text-center space-y-1">
