@@ -109,57 +109,78 @@ const CameraController = ({ player, ball }: { player: Player; ball: Ball }) => {
 const Stadium = () => {
   return (
     <group>
-      {/* Stadium walls/stands - all four sides */}
+      {/* Stadium walls/stands - all four sides with gradient effect */}
       {/* Left stand */}
-      <mesh position={[-60, 8, 0]} receiveShadow>
+      <mesh position={[-60, 8, 0]} receiveShadow castShadow>
         <boxGeometry args={[4, 16, 80]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+        <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
       {/* Right stand */}
-      <mesh position={[60, 8, 0]} receiveShadow>
+      <mesh position={[60, 8, 0]} receiveShadow castShadow>
         <boxGeometry args={[4, 16, 80]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+        <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
       {/* Top stand */}
-      <mesh position={[0, 8, -40]} receiveShadow>
+      <mesh position={[0, 8, -40]} receiveShadow castShadow>
         <boxGeometry args={[120, 16, 4]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+        <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
       {/* Bottom stand */}
-      <mesh position={[0, 8, 40]} receiveShadow>
+      <mesh position={[0, 8, 40]} receiveShadow castShadow>
         <boxGeometry args={[120, 16, 4]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
+        <meshStandardMaterial color="#2d3748" roughness={0.7} metalness={0.2} emissive="#1a202c" emissiveIntensity={0.1} />
       </mesh>
 
-      {/* Floodlights */}
+      {/* Floodlights with brighter illumination */}
       {[
-        [-55, 20, -35],
-        [-55, 20, 35],
-        [55, 20, -35],
-        [55, 20, 35],
+        [-55, 22, -35],
+        [-55, 22, 35],
+        [55, 22, -35],
+        [55, 22, 35],
       ].map((pos, idx) => (
         <group key={idx} position={pos as [number, number, number]}>
-          <mesh>
-            <cylinderGeometry args={[0.3, 0.3, 12, 8]} />
-            <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
+          <mesh castShadow>
+            <cylinderGeometry args={[0.4, 0.4, 15, 8]} />
+            <meshStandardMaterial color="#4a5568" metalness={0.9} roughness={0.1} />
           </mesh>
-          <pointLight position={[0, 2, 0]} intensity={300} distance={60} color="#ffffff" />
+          {/* Main floodlight */}
+          <pointLight position={[0, 3, 0]} intensity={500} distance={80} color="#fff8e1" castShadow />
+          {/* Ambient fill light */}
+          <pointLight position={[0, 5, 0]} intensity={200} distance={100} color="#ffffff" />
         </group>
       ))}
 
-      {/* Advertising boards around field */}
+      {/* Advertising boards with emissive glow */}
       {[-52, 52].map((x, idx) => (
         <mesh key={`ad-lr-${idx}`} position={[x, 1, 0]} rotation={[0, idx === 0 ? Math.PI / 2 : -Math.PI / 2, 0]}>
           <planeGeometry args={[60, 2]} />
-          <meshStandardMaterial color="#0066cc" roughness={0.6} />
+          <meshStandardMaterial
+            color="#1e88e5"
+            roughness={0.3}
+            metalness={0.4}
+            emissive="#1565c0"
+            emissiveIntensity={0.3}
+          />
         </mesh>
       ))}
       {[-32, 32].map((z, idx) => (
         <mesh key={`ad-tb-${idx}`} position={[0, 1, z]} rotation={[0, idx === 0 ? Math.PI : 0, 0]}>
           <planeGeometry args={[100, 2]} />
-          <meshStandardMaterial color="#cc0000" roughness={0.6} />
+          <meshStandardMaterial
+            color="#e53935"
+            roughness={0.3}
+            metalness={0.4}
+            emissive="#c62828"
+            emissiveIntensity={0.3}
+          />
         </mesh>
       ))}
+
+      {/* Sky/background with gradient effect */}
+      <mesh position={[0, 30, 0]}>
+        <sphereGeometry args={[150, 32, 32]} />
+        <meshBasicMaterial color="#87ceeb" side={THREE.BackSide} />
+      </mesh>
     </group>
   );
 };
@@ -240,25 +261,51 @@ const POVScene = ({ player, redTeam, blueTeam, ball, isRed }: PlayerPOVProps) =>
       <CameraController player={player} ball={ball} />
 
       <group>
-        {/* Lighting */}
-        <ambientLight intensity={0.5} />
+        {/* Lighting - Brighter and more vibrant */}
+        <ambientLight intensity={0.8} />
         <directionalLight
-          position={[20, 40, 20]}
-          intensity={1.2}
+          position={[20, 50, 20]}
+          intensity={1.8}
+          color="#fff8e1"
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
         />
-        <hemisphereLight intensity={0.4} groundColor="#0a3a2a" />
+        <directionalLight
+          position={[-20, 30, -20]}
+          intensity={0.5}
+          color="#ffffff"
+        />
+        <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#15803d" />
 
         {/* Stadium features */}
         <Stadium />
 
-        {/* Field */}
+        {/* Field - Brighter green with grass-like appearance */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[FIELD_WIDTH / 10, FIELD_HEIGHT / 10]} />
-          <meshStandardMaterial color="#10b981" roughness={0.8} metalness={0.1} />
+          <meshStandardMaterial
+            color="#22c55e"
+            roughness={0.9}
+            metalness={0.0}
+            emissive="#16a34a"
+            emissiveIntensity={0.1}
+          />
         </mesh>
+
+        {/* Grass pattern stripes for realism */}
+        {Array.from({ length: 10 }).map((_, i) => (
+          <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, -30 + i * 6]} receiveShadow>
+            <planeGeometry args={[FIELD_WIDTH / 10, 6]} />
+            <meshStandardMaterial
+              color={i % 2 === 0 ? "#22c55e" : "#16a34a"}
+              roughness={0.9}
+              metalness={0.0}
+              transparent
+              opacity={0.3}
+            />
+          </mesh>
+        ))}
 
         {/* Field border */}
         <lineSegments position={[0, 0.01, 0]}>
