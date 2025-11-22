@@ -288,13 +288,14 @@ export default function TacticalFootball() {
   const [is3DMode, setIs3DMode] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [playerKnowledge, setPlayerKnowledge] = useState<Map<string, PlayerKnowledge>>(new Map());
+  const [backgroundCapturePlayer, setBackgroundCapturePlayer] = useState<string | null>(null);
 
   const kickCooldowns = useRef(new Map<string, number>());
   const lockedPlayersRef = useRef(new Map<string, LockInfo>());
   const msgTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reqRef = useRef<number | undefined>(undefined);
-  const screenshotTimers = useRef<Map<string, number>>(new Map());
-  const povCanvasRefs = useRef<Map<string, HTMLCanvasElement | null>>(new Map());
+  const screenshotTimer = useRef<number | null>(null);
+  const currentCaptureIndex = useRef<number>(0);
 
   useEffect(() => {
     resetMatch();
@@ -679,54 +680,57 @@ export default function TacticalFootball() {
     };
   }, [update]);
 
-  // Handle canvas ready and setup screenshot capture
-  const handleCanvasReady = useCallback((playerId: string, canvas: HTMLCanvasElement) => {
-    povCanvasRefs.current.set(playerId, canvas);
+  // Handle canvas ready for background capture
+  const handleBackgroundCanvasReady = useCallback((playerId: string, canvas: HTMLCanvasElement) => {
+    // Capture screenshot immediately when canvas is ready
+    try {
+      const screenshot = canvas.toDataURL('image/jpeg', 0.7);
 
-    // Clear existing timer if any
-    const existingTimer = screenshotTimers.current.get(playerId);
-    if (existingTimer) {
-      clearInterval(existingTimer);
-    }
-
-    // Setup 1-second interval screenshot capture
-    const timer = setInterval(() => {
-      if (!canvas) return;
-
-      try {
-        const screenshot = canvas.toDataURL('image/jpeg', 0.7);
-
-        setPlayerKnowledge(prev => {
-          const updated = new Map(prev);
-          const knowledge = updated.get(playerId);
-          if (knowledge) {
-            const newScreenshots = [...knowledge.fovScreenshots, screenshot];
-            // Keep only last 10
-            if (newScreenshots.length > 10) {
-              newScreenshots.shift();
-            }
-            updated.set(playerId, {
-              ...knowledge,
-              fovScreenshots: newScreenshots
-            });
+      setPlayerKnowledge(prev => {
+        const updated = new Map(prev);
+        const knowledge = updated.get(playerId);
+        if (knowledge) {
+          const newScreenshots = [...knowledge.fovScreenshots, screenshot];
+          // Keep only last 10
+          if (newScreenshots.length > 10) {
+            newScreenshots.shift();
           }
-          return updated;
-        });
-      } catch (error) {
-        console.error('Failed to capture screenshot:', error);
-      }
-    }, 1000); // 1 second interval
-
-    screenshotTimers.current.set(playerId, timer as unknown as number);
+          updated.set(playerId, {
+            ...knowledge,
+            fovScreenshots: newScreenshots
+          });
+        }
+        return updated;
+      });
+    } catch (error) {
+      console.error(`Failed to capture screenshot for ${playerId}:`, error);
+    }
   }, []);
 
-  // Cleanup screenshot timers on unmount or player change
+  // Rotate through all players for background POV capture
   useEffect(() => {
+    const allPlayerIds = [...renderRed, ...renderBlue].map(p => p.id);
+
+    if (allPlayerIds.length === 0) return;
+
+    // Start the rotation timer
+    if (screenshotTimer.current) {
+      clearInterval(screenshotTimer.current);
+    }
+
+    screenshotTimer.current = setInterval(() => {
+      // Rotate to next player (each player gets captured once per cycle)
+      currentCaptureIndex.current = (currentCaptureIndex.current + 1) % allPlayerIds.length;
+      setBackgroundCapturePlayer(allPlayerIds[currentCaptureIndex.current]);
+    }, 1000 / allPlayerIds.length) as unknown as number; // Divide second by number of players for smooth rotation
+
     return () => {
-      screenshotTimers.current.forEach(timer => clearInterval(timer));
-      screenshotTimers.current.clear();
+      if (screenshotTimer.current) {
+        clearInterval(screenshotTimer.current);
+        screenshotTimer.current = null;
+      }
     };
-  }, [selectedPlayer]);
+  }, [renderRed.length, renderBlue.length]);
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center py-8 px-4 font-sans text-zinc-300">
@@ -800,7 +804,28 @@ export default function TacticalFootball() {
         selectedPlayer={selectedPlayer}
       />
 
-      {/* Player First-Person POV */}
+      {/* Background POV Capture (hidden) */}
+      {backgroundCapturePlayer && (() => {
+        const allPlayers = [...renderRed, ...renderBlue];
+        const player = allPlayers.find(p => p.id === backgroundCapturePlayer);
+        const isRed = backgroundCapturePlayer.startsWith('r');
+        const knowledge = playerKnowledge.get(backgroundCapturePlayer);
+        return player && knowledge ? (
+          <div className="hidden">
+            <PlayerPOV
+              player={player}
+              redTeam={renderRed}
+              blueTeam={renderBlue}
+              ball={renderBall}
+              isRed={isRed}
+              knowledge={knowledge}
+              onCanvasReady={handleBackgroundCanvasReady}
+            />
+          </div>
+        ) : null;
+      })()}
+
+      {/* Player First-Person POV (visible) */}
       {selectedPlayer && (() => {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === selectedPlayer);
@@ -814,7 +839,6 @@ export default function TacticalFootball() {
             ball={renderBall}
             isRed={isRed}
             knowledge={knowledge}
-            onCanvasReady={handleCanvasReady}
           />
         ) : null;
       })()}
