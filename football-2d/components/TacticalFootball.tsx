@@ -9,7 +9,9 @@ import {
   Pause,
   FastForward,
   Box,
-  SquareDashedBottom
+  SquareDashedBottom,
+  Gamepad2,
+  Eye
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import StrategyPanel from './StrategyPanel';
@@ -312,6 +314,8 @@ export default function TacticalFootball() {
   const [renderBall, setRenderBall] = useState<Ball>({ x: FIELD_WIDTH/2, y: FIELD_HEIGHT/2, vx: 0, vy: 0 });
   const [renderRed, setRenderRed] = useState<Player[]>([]);
   const [renderBlue, setRenderBlue] = useState<Player[]>([]);
+  // Track selected sectors (from device or UI). Multiple sectors can be active.
+  const [selectedSectors, setSelectedSectors] = useState<number[]>([]);
 
   const gameState = useRef({
     ball: { x: FIELD_WIDTH/2, y: FIELD_HEIGHT/2, vx: 0, vy: 0 },
@@ -327,6 +331,12 @@ export default function TacticalFootball() {
   const [simSpeed, setSimSpeed] = useState(0.6);
   const [isPaused, setIsPaused] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
+  const [appMode, setAppMode] = useState<'GAME' | 'POV'>('GAME');
+  const [deviceConnected, setDeviceConnected] = useState(false);
+  const [deviceStatus, setDeviceStatus] = useState('No device');
+
+  const mxRef = useRef<any>(null);
+  const lastDeviceUpdate = useRef<number>(0);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [playerKnowledge, setPlayerKnowledge] = useState<Map<string, PlayerKnowledge>>(new Map());
   const [backgroundCapturePlayer, setBackgroundCapturePlayer] = useState<string | null>(null);
@@ -542,14 +552,43 @@ export default function TacticalFootball() {
         }
     });
 
-    if (candidateId) {
-        lockedPlayersRef.current.set(candidateId, {
-            targetSector: sectorId,
-            timer: TACTICAL_LOCK_DURATION
-        });
-        setLockedPlayersUI(new Map(lockedPlayersRef.current));
+      if (candidateId) {
+      lockedPlayersRef.current.set(candidateId, {
+        targetSector: sectorId,
+        timer: TACTICAL_LOCK_DURATION
+      });
+      setLockedPlayersUI(new Map(lockedPlayersRef.current));
+      // Add this sector to the selected sectors when a lock is actually created
+      setSelectedSectors(prev => prev.includes(sectorId) ? prev : [...prev, sectorId]);
     }
-  }, []);
+    }, []);
+
+    // Device button listener: lock players when device buttons (0-8) are pressed
+    useEffect(() => {
+      const dev = mxRef.current;
+      if (!dev) return;
+
+      const handleKeyDown = (e: any) => {
+        const key = e && e.detail && typeof e.detail.key === 'number' ? e.detail.key : null;
+        if (key !== null && key >= 0 && key <= 8) {
+          // Only attempt to assign a player; do NOT pre-set selection here.
+          // Selection is set inside `assignPlayerToSector` only when a lock is actually created.
+          try { assignPlayerToSector(key); }
+          catch (err) { console.warn('assignPlayerToSector error', err); }
+        }
+      };
+
+      dev.addEventListener('keydown', handleKeyDown);
+      return () => { dev.removeEventListener('keydown', handleKeyDown); };
+    }, [assignPlayerToSector, deviceConnected]);
+
+    // Clear `selectedSectors` entries when no player is locked to them anymore
+    useEffect(() => {
+      if (!selectedSectors || selectedSectors.length === 0) return;
+      // Keep only sectors that still have active locks
+      const remaining = selectedSectors.filter(sec => Array.from(lockedPlayersRef.current.values()).some(l => l.targetSector === sec));
+      if (remaining.length !== selectedSectors.length) setSelectedSectors(remaining);
+    }, [lockedPlayersUI, selectedSectors]);
 
   const update = useCallback(() => {
     if (isPaused) { reqRef.current = requestAnimationFrame(update); return; }
@@ -817,8 +856,210 @@ export default function TacticalFootball() {
         setLockedPlayersUI(new Map(lockedPlayersRef.current));
     }
 
+    // Device sync: throttle to ~10 FPS
+    const now = performance.now();
+    if (mxRef.current && mxRef.current.device && now - lastDeviceUpdate.current > 50) {
+      lastDeviceUpdate.current = now;
+      renderDeviceSheet().catch((err: any) => console.warn('Device render error', err));
+    }
+
     reqRef.current = requestAnimationFrame(update);
   }, [simSpeed, lockedPlayersUI.size, isPaused]);
+
+  // Connect to MX Creative Console
+  const connectDevice = async () => {
+    try {
+      const mod = await import('../app/packages/mx-creative-console.js');
+      const MXCreativeConsole = mod.MXCreativeConsole;
+      mxRef.current = new MXCreativeConsole();
+      mxRef.current.addEventListener('connected', () => { setDeviceConnected(true); setDeviceStatus('Connected'); });
+      mxRef.current.addEventListener('disconnected', () => { setDeviceConnected(false); setDeviceStatus('Disconnected'); mxRef.current = null; });
+      await mxRef.current.connect();
+      setDeviceStatus('Connected');
+    } catch (err: any) {
+      console.warn('Connect failed', err);
+      setDeviceStatus(err && err.message ? err.message : String(err));
+      alert('Device connect failed: ' + (err && err.message ? err.message : err));
+    }
+  };
+
+  const disconnectDevice = () => {
+    try {
+      if (mxRef.current) mxRef.current.disconnect();
+    } catch (err) { /* ignore */ }
+    mxRef.current = null;
+    setDeviceConnected(false);
+    setDeviceStatus('Disconnected');
+  };
+
+  // Render a 3x3 sector sheet and push to device
+  const renderDeviceSheet = async () => {
+    if (!mxRef.current || !mxRef.current.device) return;
+
+    const KEY_SIZE = 118;
+    const GAP = 40;
+    const ORIGIN_X = 23;
+    const ORIGIN_Y = 6;
+    const COLS = 3;
+    const ROWS = 3;
+
+    const sheetWidth = ORIGIN_X + COLS * KEY_SIZE + (COLS - 1) * GAP;
+    const sheetHeight = ORIGIN_Y + ROWS * KEY_SIZE + (ROWS - 1) * GAP;
+
+    const sheet = document.createElement('canvas');
+    sheet.width = sheetWidth;
+    sheet.height = sheetHeight;
+    const sctx = sheet.getContext('2d')!;
+
+    // background
+    const bg = sctx.createLinearGradient(0, 0, sheet.width, sheet.height);
+    bg.addColorStop(0, '#071018'); bg.addColorStop(1, '#031018');
+    sctx.fillStyle = bg;
+    sctx.fillRect(0, 0, sheet.width, sheet.height);
+
+    const sectorW = KEY_SIZE;
+    const sectorH = KEY_SIZE;
+
+    // Total content region (where sectors/keys are laid out)
+    const contentWidth = COLS * sectorW + (COLS - 1) * GAP;
+    const contentHeight = ROWS * sectorH + (ROWS - 1) * GAP;
+
+    // Map ball from field -> sheet content area (respecting origin and gaps)
+    const sheetBallX = ORIGIN_X + (gameState.current.ball.x / FIELD_WIDTH) * contentWidth;
+    const sheetBallY = ORIGIN_Y + (gameState.current.ball.y / FIELD_HEIGHT) * contentHeight;
+
+    // Determine active sector by mapping sheetBall into grid cells (accounting for gaps)
+    const sectorCol = Math.min(COLS - 1, Math.max(0, Math.floor((sheetBallX - ORIGIN_X) / (sectorW + GAP))));
+    const sectorRow = Math.min(ROWS - 1, Math.max(0, Math.floor((sheetBallY - ORIGIN_Y) / (sectorH + GAP))));
+
+    // Which sectors should be highlighted on the device:
+    // Only highlight sectors that were explicitly selected AND still have an active lock.
+    const highlightSet = new Set<number>();
+    (selectedSectors || []).forEach(sec => {
+      const stillLocked = Array.from(lockedPlayersRef.current.values()).some(l => l.targetSector === sec);
+      if (stillLocked) highlightSet.add(sec);
+    });
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = ORIGIN_X + c * (sectorW + GAP);
+        const y = ORIGIN_Y + r * (sectorH + GAP);
+
+        // base
+        sctx.fillStyle = 'rgba(255,255,255,0.03)';
+        sctx.fillRect(x, y, sectorW, sectorH);
+        sctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        sctx.lineWidth = 2;
+        sctx.strokeRect(x + 1, y + 1, sectorW - 2, sectorH - 2);
+
+        // Orange border if explicitly selected and still active
+        if (highlightSet.has(r * 3 + c)) {
+          sctx.save();
+          sctx.strokeStyle = '#f59e1b';
+          sctx.lineWidth = 6;
+          sctx.strokeRect(x + 3, y + 3, sectorW - 6, sectorH - 6);
+          sctx.restore();
+        }
+
+        if (c === sectorCol && r === sectorRow) {
+          // sctx.fillStyle = 'rgba(34,193,195,0.16)';
+          // sctx.fillRect(x, y, sectorW, sectorH);
+
+          // marker inside sector: compute relative to precise sheet position
+          const localBx = sheetBallX - x;
+          const localBy = sheetBallY - y;
+          const markerR = 8;
+          sctx.beginPath();
+          sctx.fillStyle = '#ffffff';
+          sctx.shadowColor = 'rgba(0,0,0,0.45)';
+          sctx.shadowBlur = 12;
+          sctx.arc(x + localBx, y + localBy, markerR, 0, Math.PI * 2);
+          sctx.fill();
+          sctx.shadowBlur = 0;
+        }
+      }
+    }
+
+    // Draw players (map field positions into the same content area)
+    // Use the same visual diameter used by sector widgets in the web UI
+    // SectorKey uses a ~12px diameter marker (`w-3 h-3` in Tailwind -> 0.75rem = 12px)
+    // Scale this relative to KEY_SIZE so changes to key size keep proportions
+    const SECTOR_UI_MARKER_DIAM_PX = 12;
+    const baseMarkerDiameter = 10;
+
+    const drawPlayer = (p: Player, color: string) => {
+      const px = ORIGIN_X + (p.x / FIELD_WIDTH) * contentWidth;
+      const py = ORIGIN_Y + (p.y / FIELD_HEIGHT) * contentHeight;
+      const isLocked = lockedPlayersRef.current.has(p.id);
+      const isGK = p.role === 'GK';
+
+      // shadow/halo for locked players
+      if (isLocked) {
+        sctx.beginPath();
+        sctx.fillStyle = 'rgba(245,158,11,0.22)';
+        sctx.arc(px, py, baseMarkerDiameter, 0, Math.PI * 2);
+        sctx.fill();
+      }
+
+      // player circle
+      sctx.beginPath();
+      sctx.fillStyle = color;
+      sctx.shadowColor = 'rgba(0,0,0,0.2)';
+      sctx.shadowBlur = 8;
+      sctx.arc(px, py, baseMarkerDiameter, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.shadowBlur = 0;
+
+      // small border for clarity
+      sctx.beginPath();
+      sctx.lineWidth = 1.5;
+      sctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      sctx.arc(px, py, baseMarkerDiameter, 0, Math.PI * 2);
+      sctx.stroke();
+
+      // Stronger amber ring for locked players so they stand out on the device
+      if (isLocked) {
+        sctx.save();
+        sctx.beginPath();
+        sctx.lineWidth = 3.5;
+        sctx.strokeStyle = '#f59e1b'; // amber-500
+        sctx.globalAlpha = 0.95;
+        sctx.arc(px, py, baseMarkerDiameter + 5, 0, Math.PI * 2);
+        sctx.stroke();
+
+        // Soft glow outer ring
+        sctx.beginPath();
+        sctx.fillStyle = 'rgba(245,158,11,0.12)';
+        sctx.arc(px, py, baseMarkerDiameter + 9, 0, Math.PI * 2);
+        sctx.fill();
+        sctx.restore();
+      }
+    };
+
+    // Draw red team
+    (gameState.current.red || []).forEach(p => drawPlayer(p, '#ff6b6bd5'));
+    // Draw blue team
+    (gameState.current.blue || []).forEach(p => drawPlayer(p, '#60a5fab9'));
+
+    // Draw an outer border that matches the mapped field area on the device sheet
+    sctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    sctx.lineWidth = 3;
+    sctx.strokeRect(ORIGIN_X, ORIGIN_Y, contentWidth, contentHeight);
+
+    // subtle overlay
+    // sctx.fillStyle = 'rgba(255,255,255,0.02)';
+    // sctx.fillRect(0, 0, sheet.width, sheet.height);
+
+    await new Promise<void>(resolve => {
+      sheet.toBlob(async (blob) => {
+        if (blob && mxRef.current && typeof mxRef.current.setSheetImage === 'function') {
+          try { await mxRef.current.setSheetImage(blob, 0, 0, sheet.width, sheet.height); }
+          catch (err) { console.warn('setSheetImage failed', err); }
+        }
+        resolve();
+      }, 'image/jpeg', 0.85);
+    });
+  };
 
   useEffect(() => {
     reqRef.current = requestAnimationFrame(update);
@@ -1025,6 +1266,24 @@ export default function TacticalFootball() {
 
       {/* Controls */}
       <div className="w-full max-w-3xl flex items-center justify-end gap-4 mb-2 pr-2">
+          {/* Mode Switcher */}
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg mr-auto">
+             <button
+               onClick={() => { setAppMode('GAME'); setSelectedPlayer(null); }}
+               className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${appMode === 'GAME' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+             >
+               <Gamepad2 size={14} />
+               Game
+             </button>
+             <button
+               onClick={() => setAppMode('POV')}
+               className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${appMode === 'POV' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+             >
+               <Eye size={14} />
+               POV
+             </button>
+          </div>
+
           <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg">
               <SlidersHorizontal size={14} className="text-zinc-500" />
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Speed: {simSpeed.toFixed(1)}x</span>
@@ -1040,6 +1299,13 @@ export default function TacticalFootball() {
           <button onClick={() => setIsPaused(!isPaused)} className="p-1.5 bg-zinc-800 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
             {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
           </button>
+
+          <div className="flex items-center gap-2">
+            <button onClick={() => deviceConnected ? disconnectDevice() : connectDevice()} className={`p-1.5 rounded-md text-sm font-semibold transition-all ${deviceConnected ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>
+              {deviceConnected ? 'Disconnect Device' : 'Connect Device'}
+            </button>
+            <div className="text-[11px] text-zinc-500">{deviceStatus}</div>
+          </div>
       </div>
 
       {is3DMode ? (
@@ -1060,8 +1326,7 @@ export default function TacticalFootball() {
                     <SectorKey key={sector.id} sector={sector} onAssign={assignPlayerToSector} redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} />
                 ))}
             </div>
-            <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-1 h-8 bg-zinc-800" />
-        </div>
+</div>
       </div>
 
       <div className="my-12" />
@@ -1071,12 +1336,15 @@ export default function TacticalFootball() {
         blueTeam={renderBlue}
         ball={renderBall}
         lockedPlayers={lockedPlayersUI}
-        onPlayerClick={setSelectedPlayer}
-        selectedPlayer={selectedPlayer}
+        onPlayerClick={(id) => {
+          if (appMode === 'GAME') return;
+          setSelectedPlayer(id);
+        }}
+        selectedPlayer={appMode === 'POV' ? selectedPlayer : null}
       />
 
       {/* Background POV Capture (visually hidden but still rendered) */}
-      {backgroundCapturePlayer && (() => {
+      {appMode === 'POV' && backgroundCapturePlayer && (() => {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === backgroundCapturePlayer);
         const isRed = backgroundCapturePlayer.startsWith('r');
@@ -1097,7 +1365,7 @@ export default function TacticalFootball() {
       })()}
 
       {/* Player First-Person POV (visible) */}
-      {selectedPlayer && (() => {
+      {appMode === 'POV' && selectedPlayer && (() => {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === selectedPlayer);
         const isRed = selectedPlayer.startsWith('r');
