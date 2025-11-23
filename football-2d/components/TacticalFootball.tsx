@@ -1245,7 +1245,7 @@ export default function TacticalFootball() {
   }, [renderRed.length, renderBlue.length]); // Don't include playerKnowledge to avoid resetting interval
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center py-8 px-4 font-sans text-zinc-300">
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center py-8 px-4 font-sans text-zinc-300 gap-4">
       {/* Header */}
       <div className="w-full max-w-3xl flex items-center justify-between mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 shadow-xl">
         <div className="flex items-center gap-4 w-1/3">
@@ -1265,7 +1265,7 @@ export default function TacticalFootball() {
       </div>
 
       {/* Controls */}
-      <div className="w-full max-w-3xl flex items-center justify-end gap-4 mb-2 pr-2">
+      <div className="w-full max-w-3xl flex items-center justify-end gap-8 mb-2 pr-2">
           {/* Mode Switcher */}
           <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg mr-auto">
              <button
@@ -1314,7 +1314,7 @@ export default function TacticalFootball() {
         <MainField redTeam={renderRed} blueTeam={renderBlue} ball={renderBall} lockedPlayers={lockedPlayersUI} matchState={gameState.current.matchState} announcerMsg={announcerMsg} />
       )}
 
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-1 mt-8">
         <div className="text-center space-y-1">
             <h2 className="text-xs font-bold text-zinc-500 tracking-[0.2em] uppercase">Tactical Command Unit</h2>
             <div className="h-px w-24 bg-gradient-to-r from-transparent via-zinc-700 to-transparent mx-auto" />
@@ -1329,7 +1329,7 @@ export default function TacticalFootball() {
 </div>
       </div>
 
-      <div className="my-12" />
+      <div className="my-16" />
 
       <StrategyPanel
         redTeam={renderRed}
