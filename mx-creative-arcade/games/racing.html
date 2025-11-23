@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Racer — MX Creative Console Demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --muted: #a0a0a0;
+            --accent: #00b8fc;
+            --neon-blue: #0ea5e9;
+            --neon-green: #10b981;
+            --neon-yellow: #f59e0b;
+        }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: 'Poppins', monospace, sans-serif;
+            background: var(--bg);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        canvas {
+            display: block;
+            background: #111;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 24px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        .score { color: #fff; }
+        .speed { color: var(--neon-blue); }
+        .boost-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .boost-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+            transition: width 0.1s;
+        }
+
+        .start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17, 17, 17, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(4px);
+        }
+        
+        h1 {
+            font-size: 42px;
+            margin: 0 0 16px 0;
+            background: linear-gradient(45deg, var(--neon-blue), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--muted);
+            padding: 12px 32px;
+            font-size: 16px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .btn:hover {
+            background: var(--neon-blue);
+            border-color: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+        }
+
+        .controls-hint {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            gap: 12px;
+            text-align: center;
+        }
+        .key-hint {
+            width: 60px;
+            height: 60px;
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #555;
+        }
+        .key-hint.active {
+            border-color: rgba(255,255,255,0.2);
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        
+        <div class="ui-overlay" id="gameUI" style="display:none">
+            <div class="score">SCORE: <span id="scoreVal">0</span></div>
+            <div class="speed">SPD: <span id="speedVal">0</span></div>
+            <div class="boost-bar"><div class="boost-fill" id="boostFill"></div></div>
+        </div>
+
+        <div class="start-screen" id="startScreen">
+            <h1>Neon Racer</h1>
+            <p style="color:var(--muted); margin-bottom:30px">Avoid traffic. Collect fuel. Survive.</p>
+            <button class="btn" id="connectBtn">Connect Device</button>
+            <button class="btn" id="startBtn" style="display:none; margin-top:10px">Start Engine</button>
+            
+            <div class="controls-hint">
+                <div class="key-hint"></div>
+                <div class="key-hint active">▲<span style="font-size:9px; margin-top:2px">GAS</span></div>
+                <div class="key-hint"></div>
+                <div class="key-hint active">◀</div>
+                <div class="key-hint active" style="color:var(--neon-blue)">⚡<span style="font-size:9px; margin-top:2px">BST</span></div>
+                <div class="key-hint active">▶</div>
+                <div class="key-hint"></div>
+                <div class="key-hint active">▼<span style="font-size:9px; margin-top:2px">BRK</span></div>
+                <div class="key-hint"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const gameUI = document.getElementById('gameUI');
+        const scoreVal = document.getElementById('scoreVal');
+        const speedVal = document.getElementById('speedVal');
+        const boostFill = document.getElementById('boostFill');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        let deviceConnected = false;
+
+        // Game State
+        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let lastTime = 0;
+        let score = 0;
+        let distance = 0;
+        
+        // Car Physics
+        const CAR_W = 40;
+        const CAR_H = 70;
+        
+        let player = {
+            x: 200 - CAR_W/2,
+            y: 500,
+            speed: 0,
+            maxSpeed: 800,
+            angle: 0,
+            boost: 0, // 0-100
+            boosting: false
+        };
+
+        let obstacles = []; // {x, y, type, speed}
+        let particles = []; // {x, y, vx, vy, life, color}
+
+        // Input State
+        const keys = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            boost: false
+        };
+
+        // --- MX Integration ---
+        
+        connectBtn.addEventListener('click', async () => {
+            try {
+                const success = await mx.connect();
+                if (success) {
+                    deviceConnected = true;
+                    connectBtn.style.display = 'none';
+                    renderDeviceKeys();
+                    startGame();
+                }
+            } catch (e) {
+                alert("Connection Failed: " + e);
+            }
+        });
+
+        // Try auto-connect
+        (async () => {
+            if(await mx.reconnect()) {
+                deviceConnected = true;
+                connectBtn.style.display = 'none';
+                renderDeviceKeys();
+                startGame();
+            }
+        })();
+
+        // Also allow start without device for testing
+        setTimeout(() => {
+            if (!deviceConnected && gameState === 'START') {
+                startBtn.style.display = 'inline-block';
+                startBtn.textContent = "Play w/ Keyboard";
+                startGame();
+            }
+        }, 1000);
+
+        startBtn.addEventListener('click', startGame);
+
+        mx.addEventListener('connected', () => renderDeviceKeys());
+        
+        mx.addEventListener('keydown', (e) => {
+            const k = e.detail.key;
+            
+            // Navigation: Left Button -> Hub
+            if (k === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            handleDeviceInput(k, true);
+        });
+        
+        mx.addEventListener('keyup', (e) => {
+            const k = e.detail.key;
+            handleDeviceInput(k, false);
+        });
+
+        function handleDeviceInput(key, isPressed) {
+            if (key === 3) keys.left = isPressed;
+            if (key === 4) keys.right = isPressed;
+            if (key === 2) keys.up = isPressed;
+            if (key === 8) keys.down = isPressed;
+            if (key === 5) keys.boost = isPressed;
+            renderDeviceKeys(); // Update visual feedback
+        }
+
+        // Keyboard Fallback
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+            if(e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+            if(e.key === 'ArrowUp' || e.key === 'w') keys.up = true;
+            if(e.key === 'ArrowDown' || e.key === 's') keys.down = true;
+            if(e.key === 'Shift' || e.key === ' ') keys.boost = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+            if(e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+            if(e.key === 'ArrowUp' || e.key === 'w') keys.up = false;
+            if(e.key === 'ArrowDown' || e.key === 's') keys.down = false;
+            if(e.key === 'Shift' || e.key === ' ') keys.boost = false;
+        });
+
+
+        // --- Game Logic ---
+
+        function startGame() {
+            if (gameState === 'PLAYING') return;
+            gameState = 'PLAYING';
+            startScreen.style.display = 'none';
+            gameUI.style.display = 'flex';
+            
+            // Reset stats
+            player.x = 200 - CAR_W/2;
+            player.speed = 0;
+            player.boost = 0;
+            score = 0;
+            distance = 0;
+            obstacles = [];
+            particles = [];
+            
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function loop(now) {
+            if (gameState !== 'PLAYING') return;
+            
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+            
+            update(dt);
+            draw();
+            
+            requestAnimationFrame(loop);
+        }
+
+        function update(dt) {
+            // Handling Speed
+            const accel = 400;
+            const drag = 150;
+            let targetSpeed = 0;
+
+            if (keys.up) targetSpeed = player.maxSpeed;
+            else if (keys.down) targetSpeed = -200; // Brake/Reverse
+            
+            // Boost logic
+            if (keys.boost && player.boost > 0) {
+                player.boosting = true;
+                targetSpeed = player.maxSpeed * 1.5;
+                player.boost = Math.max(0, player.boost - dt * 30); // Drain boost
+                createParticles(player.x + CAR_W/2, player.y + CAR_H, 2, '#0ea5e9');
+            } else {
+                player.boosting = false;
+                // Regen boost slowly
+                player.boost = Math.min(100, player.boost + dt * 5);
+            }
+
+            // Apply acceleration
+            if (player.speed < targetSpeed) player.speed += accel * dt;
+            else if (player.speed > targetSpeed) player.speed -= (drag + (keys.down ? 600 : 0)) * dt;
+            
+            // Friction to stop
+            if (!keys.up && !keys.down && Math.abs(player.speed) < 10) player.speed = 0;
+
+            // Steering
+            const turnSpeed = 300 * (player.speed / player.maxSpeed); // Steer better at speed
+            if (keys.left) {
+                player.x -= turnSpeed * dt;
+                player.angle = -0.2;
+            } else if (keys.right) {
+                player.x += turnSpeed * dt;
+                player.angle = 0.2;
+            } else {
+                player.angle = 0;
+            }
+
+            // Walls
+            if (player.x < 20) { player.x = 20; player.speed *= 0.9; }
+            if (player.x > 380 - CAR_W) { player.x = 380 - CAR_W; player.speed *= 0.9; }
+
+            // Update Obstacles & Road
+            const roadSpeed = player.speed * dt;
+            distance += roadSpeed;
+            score = Math.floor(distance / 100);
+
+            // Spawn Obstacles
+            if (Math.random() < 0.02 + (score / 10000)) { // Difficulty ramps up
+                spawnObstacle();
+            }
+
+            // Move Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let o = obstacles[i];
+                // Obstacles move down relative to player speed
+                const relSpeed = o.speed - player.speed;
+                o.y -= relSpeed * dt; 
+                
+                o.y += (player.speed - o.speed) * dt;
+
+                if (o.y > 700) obstacles.splice(i, 1); // Passed
+                
+                // Collision
+                if (
+                    player.x < o.x + o.w &&
+                    player.x + CAR_W > o.x &&
+                    player.y < o.y + o.h &&
+                    player.y + CAR_H > o.y
+                ) {
+                    crash();
+                }
+            }
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // UI Updates
+            scoreVal.textContent = score;
+            speedVal.textContent = Math.floor(player.speed / 5);
+            boostFill.style.width = player.boost + '%';
+        }
+        
+        let frameCount = 0;
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+
+            // Road
+            drawRoad();
+
+            // Obstacles
+            obstacles.forEach(o => {
+                ctx.fillStyle = o.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = o.color;
+                ctx.fillRect(o.x, o.y, o.w, o.h);
+                ctx.shadowBlur = 0;
+                
+                // Simple detail
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(o.x + 5, o.y + 5, o.w - 10, 10); // Windshield
+            });
+
+            // Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fillRect(p.x, p.y, 4, 4);
+                ctx.globalAlpha = 1;
+            });
+
+            // Player
+            ctx.save();
+            ctx.translate(player.x + CAR_W/2, player.y + CAR_H/2);
+            ctx.rotate(player.angle);
+            
+            // Car Body
+            ctx.fillStyle = '#f43f5e';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#f43f5e';
+            ctx.fillRect(-CAR_W/2, -CAR_H/2, CAR_W, CAR_H);
+            
+            // Boost effect
+            if (player.boosting) {
+                ctx.fillStyle = '#0ea5e9';
+                ctx.shadowColor = '#0ea5e9';
+                ctx.fillRect(-CAR_W/2 + 5, CAR_H/2, CAR_W - 10, 20 + Math.random()*10);
+            }
+            
+            ctx.shadowBlur = 0;
+            
+            // Roof / Windshield
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-CAR_W/2 + 5, -CAR_H/2 + 10, CAR_W - 10, 15); // Front glass
+            ctx.fillRect(-CAR_W/2 + 5, -CAR_H/2 + 35, CAR_W - 10, 20); // Roof/Back
+            
+            ctx.restore();
+            
+            // Throttled Device Update for Boost Meter
+            frameCount++;
+            if (frameCount % 10 === 0 && deviceConnected) {
+                renderKeyImage(5); // Update boost key
+            }
+        }
+
+        function drawRoad() {
+            const offset = (distance % 100);
+            
+            ctx.fillStyle = '#222';
+            ctx.fillRect(20, 0, 360, 600); // Asphalt
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([40, 60]);
+            ctx.lineDashOffset = -offset;
+            
+            // Lane markers
+            ctx.beginPath();
+            ctx.moveTo(140, -100);
+            ctx.lineTo(140, 700);
+            ctx.moveTo(260, -100);
+            ctx.lineTo(260, 700);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Side lights moving
+            ctx.fillStyle = '#f59e0b';
+            for (let i = -100; i < 700; i += 100) {
+                const y = i + offset;
+                ctx.fillRect(10, y, 5, 20);
+                ctx.fillRect(385, y, 5, 20);
+            }
+        }
+
+        function spawnObstacle() {
+            const x = Math.random() * (360 - 50) + 20; 
+            
+            obstacles.push({
+                x: x,
+                y: -100,
+                w: 35,
+                h: 60,
+                speed: 200 + Math.random() * 200, // Moving traffic
+                color: Math.random() > 0.5 ? '#a855f7' : '#eab308'
+            });
+        }
+
+        function createParticles(x, y, count, color) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x + (Math.random() * 10 - 5),
+                    y: y,
+                    vx: (Math.random() - 0.5) * 100,
+                    vy: 100 + Math.random() * 100, // Move down
+                    life: 0.5 + Math.random() * 0.5,
+                    color: color
+                });
+            }
+        }
+
+        function crash() {
+            gameState = 'GAMEOVER';
+            gameUI.style.display = 'none';
+            startScreen.style.display = 'flex';
+            startScreen.innerHTML = `
+                <h1>CRASHED!</h1>
+                <p style="font-size:24px;color:#fff; margin: 0 0 20px 0">SCORE: ${score}</p>
+                <button class="btn" id="restartBtn">Try Again</button>
+            `;
+            document.getElementById('restartBtn').addEventListener('click', () => {
+                // Reset UI html
+                startScreen.innerHTML = `
+                    <h1>Neon Racer</h1>
+                    <p style="color:var(--muted); margin-bottom:30px">Avoid traffic. Collect fuel. Survive.</p>
+                    <button class="btn" id="connectBtn" style="display:none">Connect Device</button>
+                    <button class="btn" id="startBtn">Start Engine</button>
+                    <div class="controls-hint">
+                        <div class="key-hint"></div>
+                        <div class="key-hint active">▲<br><span style="font-size:10px">GAS</span></div>
+                        <div class="key-hint"></div>
+                        <div class="key-hint active">◀</div>
+                        <div class="key-hint active" style="color:var(--neon-blue)">⚡<br><span style="font-size:10px">BST</span></div>
+                        <div class="key-hint active">▶</div>
+                        <div class="key-hint"></div>
+                        <div class="key-hint active">▼<br><span style="font-size:10px">BRK</span></div>
+                        <div class="key-hint"></div>
+                    </div>
+                `;
+                // Rebind
+                const start = document.getElementById('startBtn');
+                start.textContent = "Restart";
+                start.addEventListener('click', startGame);
+            });
+        }
+
+        // --- Device Rendering ---
+
+        async function renderKeyImage(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Base styling
+            const pressed = (index === 2 && keys.up) || 
+                          (index === 8 && keys.down) || 
+                          (index === 4 && keys.left) || 
+                          (index === 6 && keys.right) || 
+                          (index === 5 && keys.boost);
+            
+            ctx.fillStyle = pressed ? '#1e1e1e' : '#111111';
+            ctx.fillRect(0, 0, size, size);
+            
+            ctx.strokeStyle = pressed ? '#fff' : 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(4, 4, size-8, size-8);
+
+            // Icons
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 40px Arial';
+
+            if (index === 2) { // GAS
+                ctx.fillStyle = '#10b981';
+                ctx.beginPath();
+                ctx.moveTo(size/2, size/2 - 20);
+                ctx.lineTo(size/2 - 15, size/2 + 10);
+                ctx.lineTo(size/2 + 15, size/2 + 10);
+                ctx.fill();
+                ctx.font = '12px monospace';
+                ctx.fillStyle = '#fff';
+                ctx.fillText('GAS', size/2, size/2 + 25);
+            } else if (index === 8) { // BRAKE
+                ctx.fillStyle = '#f43f5e';
+                ctx.fillRect(size/2 - 20, size/2 - 10, 40, 20);
+                ctx.font = '12px monospace';
+                ctx.fillStyle = '#fff';
+                ctx.fillText('BRAKE', size/2, size/2 + 25);
+            } else if (index === 3) { // LEFT
+                ctx.fillStyle = '#eab308';
+                ctx.beginPath();
+                ctx.moveTo(size/2 - 20, size/2);
+                ctx.lineTo(size/2 + 10, size/2 - 15);
+                ctx.lineTo(size/2 + 10, size/2 + 15);
+                ctx.fill();
+            } else if (index === 4) { // RIGHT
+                ctx.fillStyle = '#eab308';
+                ctx.beginPath();
+                ctx.moveTo(size/2 + 20, size/2);
+                ctx.lineTo(size/2 - 10, size/2 - 15);
+                ctx.lineTo(size/2 - 10, size/2 + 15);
+                ctx.fill();
+            } else if (index === 5) { // BOOST
+                // Dynamic Boost Meter Background
+                const pct = player.boost / 100;
+                if (pct > 0) {
+                    ctx.fillStyle = 'rgba(14, 165, 233, 0.3)';
+                    ctx.fillRect(4, size - 4 - (size-8)*pct, size-8, (size-8)*pct);
+                }
+
+                ctx.fillStyle = '#0ea5e9';
+                ctx.font = '40px Arial';
+                ctx.fillText('⚡', size/2, size/2 - 5);
+                
+                ctx.font = '12px monospace';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(`${Math.floor(player.boost)}%`, size/2, size/2 + 25);
+            } else {
+                // Decorative corner lights?
+                ctx.fillStyle = '#111';
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, 5, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx && typeof mx.setKeyImage === 'function') {
+                        try { await mx.setKeyImage(index, blob); } catch (err) {}
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        async function renderDeviceKeys() {
+            if (!mx || !mx.device) return;
+            // Batch
+            const tasks = [];
+            for(let i=0; i<9; i++) tasks.push(renderKeyImage(i));
+            await Promise.all(tasks);
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MX Dance Revolution</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --track-bg: rgba(255,255,255,0.05);
+            
+            /* Game Colors */
+            --left-color: #e879f9;
+            --down-color: #60a5fa;
+            --up-color: #4ade80;
+            --right-color: #facc15;
+            
+            /* Hard Mode Colors */
+            --ul-color: #ff6b6b;
+            --ur-color: #fbbf24;
+            --dl-color: #a78bfa;
+            --dr-color: #22d3ee;
+        }
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);
+            border: 2px solid #333;
+            border-radius: 16px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        canvas { display: block; }
+
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .score-box {
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        .score-label { font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; }
+        .score-val { font-size: 36px; font-weight: bold; font-family: monospace; }
+        
+        .combo-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .combo-box.show { opacity: 1; }
+        .combo-val { font-size: 48px; font-weight: 900; color: #fff; text-shadow: 0 0 20px rgba(255,255,255,0.5); }
+        .combo-label { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: #ccc; }
+
+        .judgment {
+            position: absolute;
+            top: 40%;
+            width: 100%;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.1s;
+        }
+        .judgment.pop { opacity: 1; transform: scale(1.2); }
+        .perfect { color: #a7f3d0; text-shadow: 0 0 10px #34d399; }
+        .good { color: #bae6fd; text-shadow: 0 0 10px #60a5fa; }
+        .miss { color: #fca5a5; text-shadow: 0 0 10px #f87171; }
+
+        .start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17, 17, 17, 0.9);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        h1 { 
+            font-size: 32px; 
+            margin: 0 0 20px; 
+            background: linear-gradient(to right, var(--left-color), var(--right-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            font-style: italic;
+            font-weight: 800;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 12px 32px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+        }
+        .btn:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
+        .btn.primary { background: var(--up-color); color: #000; border: none; }
+        .btn.primary:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(74, 222, 128, 0.4); }
+
+        .controls-map {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .key-node {
+            width: 40px; height: 40px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: #555;
+        }
+        .key-node.active { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
+        .c-left { color: var(--left-color); border-color: var(--left-color); }
+        .c-up { color: var(--up-color); border-color: var(--up-color); }
+        .c-down { color: var(--down-color); border-color: var(--down-color); }
+        .c-right { color: var(--right-color); border-color: var(--right-color); }
+        
+        .c-ul { color: var(--ul-color); border-color: var(--ul-color); }
+        .c-ur { color: var(--ur-color); border-color: var(--ur-color); }
+        .c-dl { color: var(--dl-color); border-color: var(--dl-color); }
+        .c-dr { color: var(--dr-color); border-color: var(--dr-color); }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+        <div class="ui-layer">
+            <div class="score-box">
+                <div class="score-label">Score</div>
+                <div class="score-val" id="scoreEl">000000</div>
+            </div>
+        </div>
+
+        <div id="comboEl" class="combo-box">
+            <div class="combo-val" id="comboVal">0</div>
+            <div class="combo-label">COMBO</div>
+        </div>
+        
+        <div id="judgmentEl" class="judgment">PERFECT</div>
+
+        <div class="start-screen" id="startScreen">
+            <h1>MX Dance</h1>
+            <p style="color:#ccc; margin-bottom:20px">Hit the arrows to the beat!</p>
+
+            <div class="controls-map">
+                <div class="key-node"></div>
+                <div class="key-node active c-up">⬆</div>
+                <div class="key-node"></div>
+                <div class="key-node active c-left">⬅</div>
+                <div class="key-node"></div>
+                <div class="key-node active c-right">➡</div>
+                <div class="key-node"></div>
+                <div class="key-node active c-down">⬇</div>
+                <div class="key-node"></div>
+            </div>
+
+            <button id="connectBtn" class="btn">Connect Device</button>
+            <button id="startBtn" class="btn primary" style="display:none">Start Game</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const startScreen = document.getElementById('startScreen');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+        const scoreEl = document.getElementById('scoreEl');
+        const comboEl = document.getElementById('comboEl');
+        const comboVal = document.getElementById('comboVal');
+        const judgmentEl = document.getElementById('judgmentEl');
+        // Audio Context
+        let audioCtx;
+        let nextNoteTime = 0;
+        const BPM = 128;
+        const SECONDS_PER_BEAT = 60.0 / BPM;
+        const PREVIEW_TIME = 0.1; // schedule ahead time
+
+        // Constants
+        const HIT_Y = 500;
+        let SPEED = 400;
+
+        const CONFIG = {
+            tracks: 4,
+            colors: ['#e879f9', '#4ade80', '#60a5fa', '#facc15'],
+            symbols: ['⬅', '⬆', '⬇', '➡'],
+            keyMap: { 3:0, 1:1, 7:2, 5:3 },
+            uiGrid: [
+                '', 'active c-up', '',
+                'active c-left', '', 'active c-right',
+                '', 'active c-down', ''
+            ],
+            uiSymbols: [
+                '', '⬆', '',
+                '⬅', '', '➡',
+                '', '⬇', ''
+            ]
+        };
+        const TRACK_COUNT = CONFIG.tracks;
+        const TRACK_WIDTH = 400 / TRACK_COUNT;
+
+        // State
+        let isPlaying = false;
+        let score = 0;
+        let combo = 0;
+        let lastTime = 0;
+        let spawnTimer = 0;
+        let notes = []; // { track, y, active }
+        let effects = []; // { x, y, life, color }
+        
+        // Device State
+        let deviceConnected = false;
+        let pressedKeys = new Array(TRACK_COUNT).fill(false); 
+        
+        // --- Input ---
+        
+        connectBtn.addEventListener('click', async () => {
+            try {
+                if(await mx.connect()) {
+                    deviceConnected = true;
+                    connectBtn.style.display = 'none';
+                    renderDeviceKeys();
+                    startGame();
+                }
+            } catch(e) { alert(e); }
+        });
+
+        // Try auto-connect
+        (async () => {
+            if(await mx.reconnect()) {
+                deviceConnected = true;
+                connectBtn.style.display = 'none';
+                renderDeviceKeys();
+                startGame();
+            }
+        })();
+
+        // Dev mode bypass / auto-start if no device detected
+        setTimeout(() => {
+            if(!isPlaying) {
+                startGame();
+            }
+        }, 1000);
+
+        startBtn.addEventListener('click', startGame);
+
+        const KEYBOARD_MAP = {
+            'arrowleft':0, 'arrowup':1, 'arrowdown':2, 'arrowright':3,
+            'a':0, 'w':1, 's':2, 'd':3
+        };
+
+        window.addEventListener('keydown', e => {
+            const key = e.key.toLowerCase();
+            if (KEYBOARD_MAP[key] !== undefined) handleInput(KEYBOARD_MAP[key], true);
+        });
+
+        window.addEventListener('keyup', e => {
+            const key = e.key.toLowerCase();
+            if (KEYBOARD_MAP[key] !== undefined) handleInput(KEYBOARD_MAP[key], false);
+        });
+        
+        // MX
+        mx.addEventListener('keydown', e => {
+            const k = e.detail.key;
+            
+            // Navigation: Left Button -> Hub
+            if (k === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            const track = CONFIG.keyMap[k];
+            if(track !== undefined) handleInput(track, true);
+        });
+        mx.addEventListener('keyup', e => {
+            const k = e.detail.key;
+            const track = CONFIG.keyMap[k];
+            if(track !== undefined) handleInput(track, false);
+        });
+
+        function handleInput(track, isPress) {
+            if (track === undefined) return;
+            pressedKeys[track] = isPress;
+            
+            if (isPress && isPlaying) {
+                checkHit(track);
+            }
+            renderDeviceKeys();
+        }
+
+        // --- Game Logic ---
+
+        function initAudio() {
+            if(!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if(audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type='sine', dur=0.1, vol=0.1) {
+            if(!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        function scheduleAudio() {
+            if(!audioCtx) return;
+            
+            while (nextNoteTime < audioCtx.currentTime + PREVIEW_TIME) {
+                scheduleBeat(nextNoteTime);
+                nextNoteTime += SECONDS_PER_BEAT;
+            }
+        }
+        
+        let beatCount = 0;
+        function scheduleBeat(time) {
+            const beat = beatCount % 4;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (beat === 0 || beat === 2) {
+                // Kick
+                osc.frequency.setValueAtTime(150, time);
+                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+                gain.gain.setValueAtTime(0.5, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+            } else {
+                // Snare-ish
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(200, time);
+                gain.gain.setValueAtTime(0.2, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+            }
+            
+            osc.start(time);
+            osc.stop(time + 0.5);
+            
+            beatCount++;
+        }
+
+        function startGame() {
+            if (isPlaying) return;
+            initAudio();
+            isPlaying = true;
+            startScreen.style.display = 'none';
+            score = 0;
+            combo = 0;
+            notes = [];
+            effects = [];
+            pressedKeys = new Array(TRACK_COUNT).fill(false);
+            
+            lastTime = performance.now();
+            
+            // Reset Audio Sync
+            if(audioCtx) {
+                nextNoteTime = audioCtx.currentTime + 0.5; // start slightly in future
+            }
+            
+            requestAnimationFrame(loop);
+        }
+        
+        // Pitch map
+        const PITCHES = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25];
+
+        function spawnNote() {
+            const track = Math.floor(Math.random() * TRACK_COUNT);
+            notes.push({
+                track,
+                y: -50,
+                active: true
+            });
+        }
+
+        function checkHit(track) {
+            const candidates = notes.filter(n => n.active && n.track === track && n.y > HIT_Y - 100 && n.y < HIT_Y + 100);
+            if (candidates.length === 0) return;
+
+            let closest = candidates.reduce((prev, curr) => {
+                return (Math.abs(curr.y - HIT_Y) < Math.abs(prev.y - HIT_Y) ? curr : prev);
+            });
+
+            const dist = Math.abs(closest.y - HIT_Y);
+            
+            if (dist < 25) hit(closest, 'PERFECT', 100);
+            else if (dist < 55) hit(closest, 'GOOD', 50);
+            else if (dist < 95) hit(closest, 'OK', 10);
+        }
+
+        function hit(note, type, pts) {
+            note.active = false;
+            score += pts + (combo * 10);
+            combo++;
+            scoreEl.textContent = score.toString().padStart(6, '0');
+            
+            showFeedback(type);
+            createExplosion(trackX(note.track), HIT_Y, CONFIG.colors[note.track]);
+            
+            // Play Synth Tone
+            const freq = PITCHES[note.track % PITCHES.length];
+            playTone(freq, 'sine', 0.2, 0.3);
+            
+            // Flash device key
+            if(deviceConnected) {
+                const map = CONFIG.keyMap;
+                const deviceKey = Object.keys(map).find(k => map[k] === note.track);
+                if(deviceKey) flashKey(parseInt(deviceKey), '#ffffff');
+            }
+        }
+
+        function miss(note) {
+            note.active = false;
+            combo = 0;
+            showFeedback('MISS');
+            
+            // Error sound
+            playTone(100, 'sawtooth', 0.2, 0.2);
+            
+            if(deviceConnected) {
+                const map = CONFIG.keyMap;
+                const deviceKey = Object.keys(map).find(k => map[k] === note.track);
+                if(deviceKey) flashKey(parseInt(deviceKey), '#ff0000');
+            }
+        }
+
+        function showFeedback(text) {
+            judgmentEl.textContent = text;
+            judgmentEl.className = 'judgment pop ' + text.toLowerCase();
+            requestAnimationFrame(() => {
+                judgmentEl.classList.remove('pop');
+                requestAnimationFrame(() => judgmentEl.classList.add('pop'));
+            });
+
+            if (combo > 1) {
+                comboEl.classList.add('show');
+                comboVal.textContent = combo;
+            } else {
+                comboEl.classList.remove('show');
+            }
+        }
+
+        function loop(now) {
+            if (!isPlaying) return;
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+            
+            // Audio Scheduler
+            scheduleAudio();
+
+            // Spawner
+            spawnTimer -= dt;
+            if (spawnTimer <= 0) {
+                spawnNote();
+                // Sync to BPM roughly
+                spawnTimer = SECONDS_PER_BEAT; 
+            }
+
+            notes.forEach(n => {
+                n.y += SPEED * dt;
+                if (n.active && n.y > HIT_Y + 100) {
+                    miss(n);
+                }
+            });
+            
+            notes = notes.filter(n => n.y < 700 && (n.active || n.y < HIT_Y + 150));
+
+            effects.forEach((e, i) => {
+                e.life -= dt * 2;
+                e.r += dt * 50;
+            });
+            effects = effects.filter(e => e.life > 0);
+
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function trackX(i) {
+            return i * TRACK_WIDTH + TRACK_WIDTH / 2;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Tracks
+            for (let i = 0; i < TRACK_COUNT; i++) {
+                const x = trackX(i);
+                
+                // Track line
+                ctx.fillStyle = 'rgba(255,255,255,0.03)';
+                ctx.fillRect(i * TRACK_WIDTH, 0, TRACK_WIDTH, canvas.height);
+
+                // Target Zone
+                const pressed = pressedKeys[i];
+                ctx.strokeStyle = pressed ? '#fff' : 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                const r = 30;
+                ctx.arc(x, HIT_Y, r, 0, Math.PI*2);
+                ctx.stroke();
+
+                if(pressed) {
+                ctx.fillStyle = CONFIG.colors[i];
+                    ctx.globalAlpha = 0.3;
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+                
+                // Icon
+                ctx.fillStyle = pressed ? '#fff' : CONFIG.colors[i];
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(CONFIG.symbols[i], x, HIT_Y);
+            }
+
+            // Notes
+            notes.forEach(n => {
+                if(!n.active) return;
+                const x = trackX(n.track);
+                const r = 28;
+                
+                ctx.beginPath();
+                ctx.arc(x, n.y, r, 0, Math.PI*2);
+                ctx.fillStyle = CONFIG.colors[n.track];
+                ctx.fill();
+                
+                ctx.fillStyle = '#000';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(CONFIG.symbols[n.track], x, n.y);
+                
+                // Shine
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.beginPath();
+                ctx.arc(x - r/3, n.y - r/3, r/3, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Effects
+            effects.forEach(e => {
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
+                ctx.strokeStyle = e.color;
+                ctx.lineWidth = 4 * e.life;
+                ctx.globalAlpha = e.life;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            });
+        }
+
+        function createExplosion(x, y, color) {
+            effects.push({x, y, r: 30, life: 1, color});
+        }
+
+        // --- Device Rendering ---
+
+        const flashState = {}; // keyIndex -> { color, endTime }
+
+        function flashKey(index, color) {
+            flashState[index] = { color, endTime: performance.now() + 150 };
+            renderDeviceKeys();
+            setTimeout(renderDeviceKeys, 160); // clear after
+        }
+
+        async function renderKeyImage(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Check flash
+            const flash = flashState[index];
+            const isFlashing = flash && flash.endTime > performance.now();
+
+            // Map key to track
+            const track = CONFIG.keyMap[index];
+            const isTrackKey = track !== undefined;
+            const isPressed = isTrackKey && pressedKeys[track];
+
+            // Bg
+            if (isFlashing) ctx.fillStyle = flash.color;
+            else if (isPressed) ctx.fillStyle = CONFIG.colors[track];
+            else ctx.fillStyle = '#18181b';
+            
+            ctx.fillRect(0,0,size,size);
+
+            // Border
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(4,4,size-8,size-8);
+
+            if (isTrackKey) {
+                // Draw Arrow
+                ctx.fillStyle = (isFlashing || isPressed) ? '#000' : CONFIG.colors[track];
+                ctx.font = '60px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(CONFIG.symbols[track], size/2, size/2);
+            } else if (index === 4) {
+                 // Center key often unused
+                 ctx.fillStyle = '#333';
+                 ctx.font = '20px Arial';
+                 ctx.textAlign = 'center';
+                 ctx.textBaseline = 'middle';
+                 ctx.fillText('MX', size/2, size/2);
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx && typeof mx.setKeyImage === 'function') {
+                        try { await mx.setKeyImage(index, blob); } catch (e) {}
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        async function renderDeviceKeys() {
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for(let i=0; i<9; i++) tasks.push(renderKeyImage(i));
+            await Promise.all(tasks);
+        }
+        
+        // Initial init placeholder (device renders after connection)
+
+    </script>
+</body>
+</html>

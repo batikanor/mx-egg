@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MX DOOM</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000;
+            color: #d00;
+            font-family: 'VT323', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 { font-size: 4rem; margin: 0; text-shadow: 0 0 20px #f00; }
+        p { font-size: 1.5rem; color: #888; }
+        #connectBtn {
+            background: #d00;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #connectBtn:disabled { background: #333; color: #555; }
+        .status { margin-top: 20px; font-size: 1.2rem; }
+        
+        /* Hidden canvas for rendering */
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+    <h1>MX DOOM</h1>
+    <p>Look at your device.</p>
+    <button id="connectBtn">CONNECT CONSOLE</button>
+    <div class="status" id="status">Waiting to connect...</div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        const connectBtn = document.getElementById('connectBtn');
+        const statusEl = document.getElementById('status');
+
+        // --- Doom Engine State ---
+        const mapWidth = 16;
+        const mapHeight = 16;
+        // 1=Wall, 0=Empty, 2=Goal?
+        const map = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,1,1,0,1,0,0,1,0,0,0,0,0,1],
+            [1,0,0,1,1,0,0,0,0,1,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,0,0,1,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+            [1,0,0,1,1,1,1,1,0,0,0,0,1,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        let player = { x: 2.5, y: 2.5, dir: 0, rot: 0, speed: 0, moveSpeed: 0.1, rotSpeed: 0.04 };
+        
+        // Sprites / Enemies
+        // Types: 1=Imp (Red)
+        const sprites = [
+            { x: 10.5, y: 10.5, type: 1, hp: 100, state: 'alive' },
+            { x: 7.5, y: 7.5, type: 1, hp: 100, state: 'alive' },
+            { x: 12.5, y: 5.5, type: 1, hp: 100, state: 'alive' }
+        ];
+        
+        // Raycasting Constants
+        const screenWidth = 354; // 118 * 3
+        const screenHeight = 354; // 118 * 3
+        const fov = Math.PI / 3;
+        const numRays = screenWidth / 4; // Lower res casting for performance, scale up
+        
+        // Render Buffers
+        const mainCanvas = document.createElement('canvas');
+        mainCanvas.width = screenWidth;
+        mainCanvas.height = screenHeight;
+        const ctx = mainCanvas.getContext('2d', { alpha: false });
+        
+        // Texture Colors
+        const colors = ['#000', '#aa0000', '#00aa00', '#0000aa', '#aaaa00'];
+
+        let isRunning = false;
+        let lastTime = 0;
+
+        // Inputs
+        const keys = { action: false }; // Keep for legacy render logic
+        const pressed = {}; // Track raw key states by index 0-8
+
+        // --- Device Connection ---
+        
+        connectBtn.addEventListener('click', async () => {
+            try { await mx.connect(); } catch (e) { console.error(e); }
+        });
+
+        mx.reconnect();
+
+        mx.addEventListener('connected', () => {
+            connectBtn.textContent = "CONNECTED";
+            connectBtn.disabled = true;
+            statusEl.textContent = "Engine Running...";
+            isRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        mx.addEventListener('keydown', (e) => {
+            const k = e.detail.key;
+            // Mapping: 
+            // 2 (Top Center) -> Forward
+            // 8 (Bottom Center) -> Backward
+            // 4 (Left) -> Turn Left
+            // 6 (Right) -> Turn Right
+            // 5 (Center) -> Shoot
+            // 9 (Bottom Left) -> Back to Hub
+            
+            pressed[k] = true;
+            
+            // 9 is Page Left (Hardware button) -> Quit
+            if (k === 9) {
+                isRunning = false;
+                window.location.href = '../hub.html';
+            }
+        });
+
+        mx.addEventListener('keyup', (e) => {
+            const k = e.detail.key;
+            pressed[k] = false;
+        });
+
+        // --- Engine Loop ---
+
+        function gameLoop(timestamp) {
+            if (!isRunning) return;
+
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            update(dt);
+            render();
+            streamToDevice();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // Control Scheme:
+            // Bottom Left (Key 7, Idx 6) -> Turn Left (Fine)
+            // Bottom Right (Key 9, Idx 8) -> Turn Right (Fine)
+            // Top Center (Key 2, Idx 1) -> Forward
+            // Bottom Center (Key 8, Idx 7) -> Backward
+            // Center (Key 5, Idx 4) -> Shoot
+            
+            const bl = pressed[6];
+            const br = pressed[8];
+            const bc = pressed[7];
+            const topCenter = pressed[1];
+            const center = pressed[4];
+            
+            // Action / Shoot
+            if (center && !keys.action) {
+                // Fire!
+                shoot();
+            }
+            keys.action = !!center;
+
+            // Rotation (Fine control)
+            const rotSpeed = player.rotSpeed; 
+            if (bl) player.dir -= rotSpeed;
+            if (br) player.dir += rotSpeed;
+            
+            // Forward Movement (Top Center)
+            if (topCenter) {
+                 const moveStep = player.moveSpeed;
+                 const newX = player.x + Math.cos(player.dir) * moveStep;
+                 const newY = player.y + Math.sin(player.dir) * moveStep;
+                 if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+                     player.x = newX;
+                     player.y = newY;
+                 }
+            }
+
+            // Backward Movement (Bottom Center)
+            if (bc) {
+                 const moveStep = -player.moveSpeed;
+                 const newX = player.x + Math.cos(player.dir) * moveStep;
+                 const newY = player.y + Math.sin(player.dir) * moveStep;
+                 if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+                     player.x = newX;
+                     player.y = newY;
+                 }
+            }
+            
+            // Update Enemies
+            sprites.forEach(sprite => {
+                if (sprite.state === 'alive') {
+                    // Simple AI: Move towards player if far enough
+                    const dx = player.x - sprite.x;
+                    const dy = player.y - sprite.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist > 1.0 && dist < 8.0) { // Aggro range
+                        const moveX = (dx / dist) * 0.02; // Slow move
+                        const moveY = (dy / dist) * 0.02;
+                        
+                        if (map[Math.floor(sprite.y)][Math.floor(sprite.x + moveX)] === 0) sprite.x += moveX;
+                        if (map[Math.floor(sprite.y + moveY)][Math.floor(sprite.x)] === 0) sprite.y += moveY;
+                    }
+                } else if (sprite.state === 'dying') {
+                    // Animation frame? Just remove after delay
+                    sprite.hp -= 10; // Fade out counter
+                    if (sprite.hp <= 0) sprite.state = 'dead';
+                }
+            });
+        }
+
+        function shoot() {
+            // Simple hitscan
+            // Check closest enemy in center of FOV
+            let closestDist = 100;
+            let hitSprite = null;
+            
+            sprites.forEach(sprite => {
+                if (sprite.state !== 'alive') return;
+                
+                const dx = sprite.x - player.x;
+                const dy = sprite.y - player.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // Angle to sprite
+                let spriteDir = Math.atan2(dy, dx) - player.dir;
+                while (spriteDir < -Math.PI) spriteDir += 2*Math.PI;
+                while (spriteDir > Math.PI) spriteDir -= 2*Math.PI;
+                
+                // Is inside center cone? ~5 degrees
+                if (Math.abs(spriteDir) < 0.1) {
+                    // Also check if wall blocks (Z-Buffer check would be better but let's trust distance for now)
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        hitSprite = sprite;
+                    }
+                }
+            });
+            
+            if (hitSprite) {
+                hitSprite.state = 'dying';
+                hitSprite.hp = 50; // used as timer
+                // console.log("Hit enemy!");
+            }
+        }
+
+        function render() {
+            // Floor & Ceiling
+            ctx.fillStyle = '#333'; // Ceiling
+            ctx.fillRect(0, 0, screenWidth, screenHeight / 2);
+            ctx.fillStyle = '#222'; // Floor
+            ctx.fillRect(0, screenHeight / 2, screenWidth, screenHeight / 2);
+
+            // ZBuffer for sprites
+            const zBuffer = new Array(screenWidth).fill(0);
+
+            // Raycasting
+            for (let i = 0; i < screenWidth; i+=4) { // Optimization: cast every 4th pixel
+                const rayAngle = (player.dir - fov / 2.0) + (i / screenWidth) * fov;
+                const eyeX = Math.cos(rayAngle);
+                const eyeY = Math.sin(rayAngle);
+
+                let distToWall = 0;
+                let hitWall = false;
+                let texture = 0;
+
+                let testX = Math.floor(player.x);
+                let testY = Math.floor(player.y);
+                
+                const stepX = eyeX < 0 ? -1 : 1;
+                const stepY = eyeY < 0 ? -1 : 1;
+                
+                // DDA variables? Or simple marching
+                // Let's do simple step marching for simplicity/readability in this demo
+                const stepSize = 0.05;
+                let distance = 0;
+                
+                while (!hitWall && distance < 16) {
+                    distance += stepSize;
+                    testX = Math.floor(player.x + eyeX * distance);
+                    testY = Math.floor(player.y + eyeY * distance);
+
+                    if (testX < 0 || testX >= mapWidth || testY < 0 || testY >= mapHeight) {
+                        hitWall = true;
+                        distance = 16;
+                    } else {
+                        if (map[testY][testX] > 0) {
+                            hitWall = true;
+                            texture = map[testY][testX]; // Wall Color
+                            // Shade based on distance?
+                        }
+                    }
+                }
+
+                if (hitWall) {
+                    // Calculate height
+                    // Fish eye fix
+                    const ca = player.dir - rayAngle;
+                    let perpDist = distance * Math.cos(ca);
+                    
+                    const ceiling = screenHeight / 2.0 - screenHeight / perpDist;
+                    const floor = screenHeight - ceiling;
+                    const height = floor - ceiling;
+
+                    // Store ZBuffer (approx)
+                    // Since we skip pixels, fill the block
+                    for (let k=0; k<4; k++) {
+                        if (i+k < screenWidth) zBuffer[i+k] = perpDist;
+                    }
+
+                    // Color
+                    let wallColor = '#800';
+                    // Shade
+                    const shade = Math.max(0.3, 1 - (distance / 16));
+                    const r = Math.floor(150 * shade);
+                    wallColor = `rgb(${r},0,0)`;
+                    if ((testX + testY) % 2 === 0) wallColor = `rgb(${r+20},0,0)`; // Checkered walls
+
+                    ctx.fillStyle = wallColor;
+                    ctx.fillRect(i, ceiling, 4, height); // Width 4 due to optimization
+                } else {
+                     // Far clipping plane Z
+                     for (let k=0; k<4; k++) if (i+k < screenWidth) zBuffer[i+k] = 100;
+                }
+            }
+            
+            // Sprite Rendering
+            // 1. Sort sprites
+            const visibleSprites = sprites.map(sprite => {
+                const dx = sprite.x - player.x;
+                const dy = sprite.y - player.y;
+                return { ...sprite, dist: Math.sqrt(dx*dx + dy*dy) };
+            }).sort((a,b) => b.dist - a.dist);
+            
+            // 2. Draw
+            visibleSprites.forEach(sprite => {
+                if (sprite.state === 'dead') return;
+                
+                const dx = sprite.x - player.x;
+                const dy = sprite.y - player.y;
+                
+                // Transform sprite with the inverse camera matrix
+                // [ planeX   dirX ] -1                                       [ dirY      -dirX ]
+                // [               ]       =  1/(planeX*dirY-dirX*planeY) *   [                 ]
+                // [ planeY   dirY ]                                          [ -planeY  planeX ]
+                
+                // Simplified projection: relative angle
+                let spriteDir = Math.atan2(dy, dx) - player.dir;
+                while (spriteDir < -Math.PI) spriteDir += 2*Math.PI;
+                while (spriteDir > Math.PI) spriteDir -= 2*Math.PI;
+                
+                // Screen X
+                // Sprite is only visible if angle is within FOV/2 + margin
+                if (Math.abs(spriteDir) < fov/1.5) {
+                    const dist = sprite.dist; // No fisheye correction for sprites usually needed if billboarding simply? actually yes.
+                    // Simple Projection
+                    const spriteScreenX = (0.5 * (spriteDir / (fov / 2)) + 0.5) * screenWidth;
+                    const spriteHeight = Math.abs(screenHeight / dist); 
+                    const spriteWidth = spriteHeight * 0.6; // Aspect ratio
+                    const spriteTop = (screenHeight - spriteHeight) / 2;
+                    
+                    const stripeWidth = 4; // Match raycast resolution
+                    
+                    // Draw Sprite Strips
+                    for (let stripe = Math.floor(-spriteWidth/2); stripe < spriteWidth/2; stripe += stripeWidth) {
+                        const sx = Math.floor(spriteScreenX + stripe);
+                        if (sx > 0 && sx < screenWidth) {
+                            if (dist < zBuffer[sx]) {
+                                // Draw vertical strip
+                                // Color based on Type/State
+                                let color = '#f00'; // Imp Red
+                                if (sprite.state === 'dying') color = '#f88'; // Hit flash
+                                
+                                // "Pixel Art" approximate: Fill Rect
+                                ctx.fillStyle = color;
+                                ctx.fillRect(sx, spriteTop, stripeWidth, spriteHeight);
+                                
+                                // Eyes/Face details
+                                if (stripe > -spriteWidth * 0.2 && stripe < spriteWidth * 0.2) {
+                                     ctx.fillStyle = '#ff0';
+                                     ctx.fillRect(sx, spriteTop + spriteHeight*0.2, stripeWidth, spriteHeight*0.1);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Crosshair
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(screenWidth/2 - 10, screenHeight/2);
+            ctx.lineTo(screenWidth/2 + 10, screenHeight/2);
+            ctx.moveTo(screenWidth/2, screenHeight/2 - 10);
+            ctx.lineTo(screenWidth/2, screenHeight/2 + 10);
+            ctx.stroke();
+            
+            // Gun (Center Key mostly)
+            const gunX = screenWidth / 2;
+            const gunY = screenHeight;
+            ctx.fillStyle = '#555';
+            ctx.fillRect(gunX - 20, gunY - 100 + (keys.action ? 20 : 0), 40, 100); // Recoil
+            
+            // Muzzle Flash
+            if (keys.action) {
+                ctx.fillStyle = '#ff0';
+                ctx.beginPath();
+                ctx.arc(gunX, gunY - 110, 30 + Math.random()*10, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        // --- Stream to Device ---
+        let isSending = false;
+        let lastSendTime = 0;
+        
+        async function streamToDevice() {
+            const now = Date.now();
+            // Limit to ~15 FPS for device
+            if (now - lastSendTime < 66) return; 
+            if (isSending) return;
+            if (!mx || !mx.device) return;
+
+            isSending = true;
+            lastSendTime = now;
+
+            // The mainCanvas is already 354x354 (approx correct for 3x3 grid 118*3)
+            // BUT the device has gaps (40px). 
+            // If we send one big image of 354x354, the device firmware might stretch it or clip it?
+            // The updated `setKeyImage(-1)` in mx-creative-console.js expects a 434x434 image (including gaps).
+            
+            // We need to construct a larger canvas that includes the gaps.
+            // 118px key + 40px gap + 118px key + 40px gap + 118px key
+            // Total = 434px
+            
+            const gap = 40;
+            const keySize = 118;
+            const fullSize = 434;
+            
+            const fullCanvas = document.createElement('canvas');
+            fullCanvas.width = fullSize;
+            fullCanvas.height = fullSize;
+            const fCtx = fullCanvas.getContext('2d');
+            
+            // Fill with black (gaps)
+            fCtx.fillStyle = '#000';
+            fCtx.fillRect(0, 0, fullSize, fullSize);
+            
+            // Slice the mainCanvas (which is compact 354x354) into the fullCanvas (434x434) with gaps
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const sx = col * keySize;
+                    const sy = row * keySize;
+                    
+                    const dx = 23 - 23 + col * (keySize + gap); // 23 is hardware offset, but relative to 0 here
+                    // Wait, the hardware offset 23 is handled in the library. 
+                    // We just need to create the image buffer 0,0 to 434,434
+                    // BUT the first key starts at x=0 in our buffer?
+                    // No, `setScreenImage` sends data starting at x=23, y=6.
+                    // So our buffer index 0 corresponds to hardware x=23.
+                    
+                    // So we just place keys at col * (118+40)
+                    const targetX = col * (keySize + gap);
+                    const targetY = row * (keySize + gap);
+                    
+                    fCtx.drawImage(mainCanvas, sx, sy, keySize, keySize, targetX, targetY, keySize, keySize);
+                }
+            }
+            
+            // Send as one blob
+            fullCanvas.toBlob(async (blob) => {
+                if (blob) {
+                    try { 
+                        // Key Index -1 triggers the full screen update mode
+                        await mx.setKeyImage(-1, blob); 
+                    } catch (e) {}
+                }
+                isSending = false;
+            }, 'image/jpeg', 0.7);
+        }
+
+    </script>
+</body>
+</html>
+

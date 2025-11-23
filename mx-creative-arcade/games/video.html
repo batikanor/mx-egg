@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Video Player — MX Creative Console</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --muted: #a0a0a0;
+            --accent: #00b8fc;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        video {
+            max-width: 100%;
+            border-radius: 12px;
+            border: 1px solid #333;
+            display: block;
+            /* Show video on screen too so user knows it's working */
+            max-height: 400px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            background: #333;
+            color: #888;
+            cursor: default;
+            transform: none;
+        }
+
+        .controls {
+            margin-top: 20px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Hardcoded path to video file -->
+        <video id="sourceVideo" src="../resources/badapple.mp4" loop playsinline muted controls></video>
+
+        <div class="controls">
+            <button id="connectBtn" class="btn">Connect Device</button>
+
+        </div>
+    </div>
+
+    <!-- Hidden canvas for processing -->
+    <canvas id="processingCanvas" style="display: none;"></canvas>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+
+        const video = document.getElementById('sourceVideo');
+        const connectBtn = document.getElementById('connectBtn');
+        const processingCanvas = document.getElementById('processingCanvas');
+        const ctx = processingCanvas.getContext('2d');
+
+        // Key size is typically 118x118? The hub uses 118.
+        const KEY_SIZE = 118;
+        const GAP_SIZE = 40;
+
+        // We will scale the video to 3 * KEY_SIZE + 2 * GAP_SIZE (approx 434)
+        const FULL_WIDTH = KEY_SIZE * 3 + GAP_SIZE * 2;
+        const FULL_HEIGHT = KEY_SIZE * 3 + GAP_SIZE * 2;
+
+        let isConnected = false;
+        let animationFrameId;
+
+        // --- Connection Handling ---
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                await mx.connect();
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        // Try auto-connect
+        mx.reconnect();
+
+        mx.addEventListener('connected', () => {
+            isConnected = true;
+            connectBtn.textContent = "Connected";
+            connectBtn.disabled = true;
+
+            // Start video if not playing
+            video.play().catch(e => console.log("Auto-play prevented", e));
+
+            startStreaming();
+        });
+
+        mx.addEventListener('disconnected', () => {
+            isConnected = false;
+            connectBtn.textContent = "Connect Device";
+            connectBtn.disabled = false;
+            cancelAnimationFrame(animationFrameId);
+        });
+
+        // --- Input Handling ---
+
+        mx.addEventListener('keydown', (e) => {
+            const k = e.detail.key;
+
+            // Back to Hub (Key 9 usually, or similar)
+            // Logic from pong.html uses key 9 (though hub uses 0-8 for keys and 9,10 for paging)
+            // Let's assume there is a back button or we map one.
+            // In pong.html: if (key === 9) ...
+            if (k === 9) {
+                window.location.href = '../hub.html';
+            }
+
+            // Play/Pause on center key (4)
+            if (k === 4) {
+                if (video.paused) video.play();
+                else video.pause();
+            }
+        });
+
+
+        // --- Video Streaming Logic ---
+
+        function startStreaming() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            // Set canvas size once
+            processingCanvas.width = FULL_WIDTH;
+            processingCanvas.height = FULL_HEIGHT;
+
+            loop();
+        }
+
+        // We use a flag to prevent stacking too many async calls if the device is slow
+        let isUpdating = false;
+
+        async function loop() {
+            if (!isConnected) return;
+
+            animationFrameId = requestAnimationFrame(loop);
+
+            if (video.paused || video.ended) return;
+            if (isUpdating) return; // Drop frame if previous update isn't done
+
+            isUpdating = true;
+
+            try {
+                // 1. Draw video frame to full grid canvas
+                // We use object-fit: cover behavior manually
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, FULL_WIDTH, FULL_HEIGHT);
+                ctx.drawImage(video, 0, 0, FULL_WIDTH, FULL_HEIGHT);
+
+                // 2. Send as single sheet
+                await new Promise(resolve => {
+                    processingCanvas.toBlob(async (blob) => {
+                        if (blob && mx) {
+                            try {
+                                // Use the new setSheetImage method for single update
+                                await mx.setSheetImage(blob);
+                            } catch (e) { }
+                        }
+                        resolve();
+                    }, 'image/jpeg', 0.8);
+                });
+
+            } catch (err) {
+                console.error("Frame update error:", err);
+            } finally {
+                isUpdating = false;
+            }
+        }
+
+        // Removed manual slicing logic as setSheetImage handles it (or device handles it)
+
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pong — MX Creative Console Demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --muted: #a0a0a0;
+            --accent: #00b8fc;
+            --p1-color: #ff6b6b;
+            --p2-color: #60a5fa;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        canvas {
+            background: #111;
+            border: 2px solid var(--panel);
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            max-width: 100%;
+        }
+
+        .controls-info {
+            display: flex;
+            gap: 40px;
+            font-size: 14px;
+            color: var(--muted);
+            background: var(--panel);
+            padding: 16px 32px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .key-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #fff;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--muted);
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn.primary {
+            background: var(--accent);
+            color: #000;
+            border: none;
+        }
+
+        .btn.primary:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+
+        .game-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #startBtn {
+            position: absolute;
+            z-index: 10;
+            padding: 16px 40px;
+            font-size: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            background: var(--accent);
+            color: #000;
+            border: none;
+        }
+
+        #status {
+            height: 24px;
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 18px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div style="display:flex; width: 100%; justify-content: space-between; align-items: center;">
+            <h1>MX Pong</h1>
+            <button id="connectBtn" class="btn primary">Connect Device</button>
+        </div>
+
+        <div class="game-wrapper">
+            <canvas id="gameCanvas" width="800" height="450"></canvas>
+            <button id="startBtn" class="btn primary">Start Game</button>
+        </div>
+
+        <div id="status">Press Space to Start</div>
+
+        <div class="controls-info">
+            <div class="player-info" style="color: var(--p1-color)">
+                <strong>Player 1</strong>
+                <span style="font-size: 12px;">Left Keys</span>
+            </div>
+            <div class="player-info" style="color: var(--p2-color)">
+                <strong>Player 2</strong>
+                <span style="font-size: 12px;">Right Keys</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+
+        // Game State
+        const PADDLE_WIDTH = 12;
+        const PADDLE_HEIGHT = 80;
+        const BALL_SIZE = 10;
+        const PADDLE_SPEED = 6; // slightly faster for smoother feel
+
+        let gameActive = false;
+        let animationId = null;
+
+        const state = {
+            p1: { y: 185, score: 0, move: 0 }, // move: -1 (up), 0, 1 (down)
+            p2: { y: 185, score: 0, move: 0 },
+            ball: { x: 400, y: 225, dx: 0, dy: 0, speed: 3 }
+        };
+
+        // Input Tracking
+        const keysPressed = new Set();
+        const deviceKeysPressed = new Set();
+
+        // MX Console
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+
+        // --- Input Handling ---
+
+        function updateMovement() {
+            // Player 1 (Left)
+            // W(87) or Device 0 -> Up
+            // S(83) or Device 6 -> Down
+            if (keysPressed.has('w') || deviceKeysPressed.has(0)) state.p1.move = -1;
+            else if (keysPressed.has('s') || deviceKeysPressed.has(6)) state.p1.move = 1;
+            else state.p1.move = 0;
+
+            // Player 2 (Right)
+            // ArrowUp(38) or Device 2 -> Up
+            // ArrowDown(40) or Device 8 -> Down
+            if (keysPressed.has('arrowup') || deviceKeysPressed.has(2)) state.p2.move = -1;
+            else if (keysPressed.has('arrowdown') || deviceKeysPressed.has(8)) state.p2.move = 1;
+            else state.p2.move = 0;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            keysPressed.add(e.key.toLowerCase());
+            if (e.code === 'Space' && !gameActive) {
+                // Trigger the start sequence via the button handler if possible to ensure connection, 
+                // but for spacebar we just start if connected or not (parity with old behavior)
+                // actually, let's just call startGame directly for space
+                startGame();
+            }
+            updateMovement();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keysPressed.delete(e.key.toLowerCase());
+            updateMovement();
+        });
+
+        // Start Button Handler
+        startBtn.addEventListener('click', async () => {
+            // Try to connect if not connected
+            if (!mx.device) {
+                try {
+                    await mx.connect();
+                } catch (e) {
+                    console.log("Connection cancelled or failed", e);
+                }
+            }
+            startGame();
+        });
+
+        // MX Events
+        connectBtn.addEventListener('click', async () => {
+            try {
+                const connected = await mx.connect();
+                if (connected) {
+                    connectBtn.textContent = 'Connected';
+                    connectBtn.disabled = true;
+                    connectBtn.classList.remove('primary');
+                }
+            } catch (e) {
+                alert('Connection failed: ' + e.message);
+            }
+        });
+
+        // Try auto-connect
+        (async () => {
+            if (await mx.reconnect()) {
+                connectBtn.textContent = 'Connected';
+                connectBtn.disabled = true;
+                connectBtn.classList.remove('primary');
+            }
+        })();
+
+        mx.addEventListener('connected', () => {
+            renderDeviceKeys();
+        });
+
+        mx.addEventListener('keydown', (e) => {
+            const key = e.detail.key;
+
+            // Navigation: Left Button -> Hub
+            if (key === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            // Start game with center button (key 4)
+            if (key === 4 && !gameActive) {
+                startGame();
+            }
+
+            deviceKeysPressed.add(key);
+            updateMovement();
+            renderDeviceKeys(); // Re-render to show active state
+        });
+
+        mx.addEventListener('keyup', (e) => {
+            deviceKeysPressed.delete(e.detail.key);
+            updateMovement();
+            renderDeviceKeys();
+        });
+
+
+        // --- Game Logic ---
+
+        function resetBall(winner) {
+            state.ball.x = canvas.width / 2;
+            state.ball.y = canvas.height / 2;
+            state.ball.speed = 3;
+
+            // Serve to the person who lost, or random start
+            const dir = winner === 1 ? 1 : -1;
+            state.ball.dx = dir * state.ball.speed;
+            state.ball.dy = (Math.random() * 4 - 2);
+        }
+
+        function startGame() {
+            if (gameActive) return;
+            gameActive = true;
+
+            // Hide UI
+            startBtn.style.display = 'none';
+            statusEl.textContent = '';
+
+            state.p1.score = 0;
+            state.p2.score = 0;
+            resetBall(Math.random() > 0.5 ? 1 : 2);
+            loop();
+        }
+
+        function update() {
+            // Move Paddles
+            if (state.p1.move !== 0) {
+                state.p1.y += state.p1.move * PADDLE_SPEED;
+                state.p1.y = Math.max(0, Math.min(canvas.height - PADDLE_HEIGHT, state.p1.y));
+            }
+            if (state.p2.move !== 0) {
+                state.p2.y += state.p2.move * PADDLE_SPEED;
+                state.p2.y = Math.max(0, Math.min(canvas.height - PADDLE_HEIGHT, state.p2.y));
+            }
+
+            // Move Ball
+            state.ball.x += state.ball.dx;
+            state.ball.y += state.ball.dy;
+
+            // Wall Collision (Top/Bottom)
+            if (state.ball.y <= 0 || state.ball.y + BALL_SIZE >= canvas.height) {
+                state.ball.dy *= -1;
+            }
+
+            // Paddle Collision
+            // P1
+            if (
+                state.ball.dx < 0 &&
+                state.ball.x <= 20 + PADDLE_WIDTH &&
+                state.ball.x + BALL_SIZE >= 20 &&
+                state.ball.y + BALL_SIZE >= state.p1.y &&
+                state.ball.y <= state.p1.y + PADDLE_HEIGHT
+            ) {
+                // Calculate hit position relative to center (-1 to 1)
+                const hitPos = (state.ball.y + BALL_SIZE / 2) - (state.p1.y + PADDLE_HEIGHT / 2);
+                const normalized = hitPos / (PADDLE_HEIGHT / 2);
+                const angle = normalized * (Math.PI / 4); // Max 45 degrees
+
+                // Calculate current speed and increase slightly
+                const currentSpeed = Math.sqrt(state.ball.dx ** 2 + state.ball.dy ** 2);
+                const nextSpeed = Math.min(currentSpeed + 0.5, 12); // Add constant speed instead of multiply to be more linear
+
+                // Set new velocity based on angle
+                state.ball.dx = nextSpeed * Math.cos(angle);
+                state.ball.dy = nextSpeed * Math.sin(angle);
+            }
+
+            // P2
+            if (
+                state.ball.dx > 0 &&
+                state.ball.x + BALL_SIZE >= canvas.width - 20 - PADDLE_WIDTH &&
+                state.ball.x <= canvas.width - 20 &&
+                state.ball.y + BALL_SIZE >= state.p2.y &&
+                state.ball.y <= state.p2.y + PADDLE_HEIGHT
+            ) {
+                const hitPos = (state.ball.y + BALL_SIZE / 2) - (state.p2.y + PADDLE_HEIGHT / 2);
+                const normalized = hitPos / (PADDLE_HEIGHT / 2);
+                const angle = normalized * (Math.PI / 4);
+
+                const currentSpeed = Math.sqrt(state.ball.dx ** 2 + state.ball.dy ** 2);
+                const nextSpeed = Math.min(currentSpeed + 0.5, 12);
+
+                state.ball.dx = -1 * nextSpeed * Math.cos(angle);
+                state.ball.dy = nextSpeed * Math.sin(angle);
+            }
+
+            // Scoring
+            if (state.ball.x < 0) {
+                state.p2.score++;
+                resetBall(1);
+            }
+            if (state.ball.x > canvas.width) {
+                state.p1.score++;
+                resetBall(2);
+            }
+
+            // Max speed cap
+            const maxSpeed = 10;
+            if (Math.abs(state.ball.dx) > maxSpeed) state.ball.dx = Math.sign(state.ball.dx) * maxSpeed;
+        }
+
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Net
+            ctx.setLineDash([10, 15]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Paddles
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillRect(20, state.p1.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+            ctx.fillStyle = '#60a5fa';
+            ctx.fillRect(canvas.width - 20 - PADDLE_WIDTH, state.p2.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+            // Ball
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(state.ball.x, state.ball.y, BALL_SIZE, BALL_SIZE);
+
+            // Scores
+            ctx.font = 'bold 48px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255, 107, 107, 0.5)';
+            ctx.fillText(state.p1.score, canvas.width / 4, 60);
+
+            ctx.fillStyle = 'rgba(96, 165, 250, 0.5)';
+            ctx.fillText(state.p2.score, 3 * canvas.width / 4, 60);
+        }
+
+        function loop() {
+            if (!gameActive) return;
+            update();
+            draw();
+            animationId = requestAnimationFrame(loop);
+        }
+
+        // Initial Draw
+        draw();
+
+
+        // --- Device Rendering ---
+
+        async function renderKeyImage(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const pressed = deviceKeysPressed.has(index);
+
+            // Background
+            ctx.fillStyle = pressed ? '#1e1e1e' : '#111111';
+            ctx.fillRect(0, 0, size, size);
+
+            // Border
+            ctx.strokeStyle = pressed ? '#ffffff' : 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(4, 4, size - 8, size - 8);
+
+            // Arrows
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (index === 0) { // P1 Up
+                ctx.strokeStyle = '#ff6b6b';
+                drawArrow(ctx, size / 2, size / 2 + 15, size / 2, size / 2 - 15);
+            } else if (index === 6) { // P1 Down
+                ctx.strokeStyle = '#ff6b6b';
+                drawArrow(ctx, size / 2, size / 2 - 15, size / 2, size / 2 + 15);
+            } else if (index === 2) { // P2 Up
+                ctx.strokeStyle = '#60a5fa';
+                drawArrow(ctx, size / 2, size / 2 + 15, size / 2, size / 2 - 15);
+            } else if (index === 8) { // P2 Down
+                ctx.strokeStyle = '#60a5fa';
+                drawArrow(ctx, size / 2, size / 2 - 15, size / 2, size / 2 + 15);
+            } else if (index === 4 && !gameActive) {
+                // Play Icon for Center Key when game not active
+                ctx.fillStyle = '#4ade80';
+                ctx.beginPath();
+                // Draw Triangle
+                const cx = size / 2;
+                const cy = size / 2;
+                const r = 15;
+                ctx.moveTo(cx - r / 2, cy - r);
+                ctx.lineTo(cx + r, cy);
+                ctx.lineTo(cx - r / 2, cy + r);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // Dim dot for unused
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx && typeof mx.setKeyImage === 'function') {
+                        try { await mx.setKeyImage(index, blob); } catch (err) { }
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        function drawArrow(ctx, x1, y1, x2, y2) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            // Arrow head
+            const headLen = 15;
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+        }
+
+        async function renderDeviceKeys() {
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for (let i = 0; i < 9; i++) tasks.push(renderKeyImage(i));
+            await Promise.all(tasks);
+        }
+
+    </script>
+</body>
+
+</html>

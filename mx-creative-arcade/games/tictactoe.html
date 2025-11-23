@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tic Tac Toe — MX Creative Console Demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --muted: #a0a0a0;
+            --accent: #00b8fc;
+            --x-color: #ff6b6b;
+            --o-color: #60a5fa;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .container {
+            width: 360px;
+            max-width: calc(100% - 48px);
+            background: var(--panel);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        h1 {
+            margin: 0 0 16px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .status {
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 0 auto 20px;
+            width: 100%;
+        }
+
+        .cell {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 44px;
+            font-weight: 700;
+            color: #fff;
+            border-radius: 12px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .cell:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .cell.x {
+            color: var(--x-color);
+        }
+
+        .cell.o {
+            color: var(--o-color);
+        }
+
+        .cell.win {
+            box-shadow: 0 0 20px rgba(0, 184, 252, 0.2) inset;
+            border-color: var(--accent);
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--muted);
+            padding: 10px 16px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn.primary {
+            background: var(--accent);
+            color: #000;
+            border: none;
+        }
+        
+        .btn.primary:hover {
+            transform: scale(1.05);
+            background: #33c9fd;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom: 12px;">
+            <h1 style="margin:0;">Tic Tac Toe</h1>
+            <div>
+                <button id="connectBtn" class="btn">Connect</button>
+            </div>
+        </div>
+        <div class="status" id="status">Player X's turn</div>
+
+        <div class="board" id="board">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="undoBtn" title="Undo last move">Undo</button>
+            <button class="btn" id="restartBtn">Restart</button>
+            <button class="btn primary" id="swapBtn">Swap Start</button>
+        </div>
+
+        <div class="footer">Local two-player — click any cell to play</div>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+
+        const connectBtn = document.getElementById('connectBtn');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                await mx.connect();
+            } catch (err) {
+                alert('Device connect failed: ' + (err && err.message ? err.message : err));
+            }
+        });
+
+        // Try auto-connect
+        mx.reconnect();
+
+        mx.addEventListener('connected', (e) => {
+            connectBtn.textContent = 'Connected';
+            connectBtn.disabled = true;
+            // push current board to device
+            renderAllKeys();
+        });
+
+        mx.addEventListener('keydown', (e) => {
+            const keyIndex = e.detail.key;
+            
+            // Navigation: Left Button -> Hub
+            if (keyIndex === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            // Map device key presses to game moves
+            if (keyIndex >= 0 && keyIndex <= 8) {
+                makeMove(keyIndex);
+            }
+        });
+
+        mx.addEventListener('keyup', () => {
+            // no-op for now
+        });
+
+        // Tic Tac Toe game (pure client-side, single file)
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const restartBtn = document.getElementById('restartBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const swapBtn = document.getElementById('swapBtn');
+
+        const cells = Array.from(document.querySelectorAll('.cell'));
+        let board = Array(9).fill(null);
+        let current = 'X';
+        let active = true;
+        let history = [];
+        let startingPlayer = 'X';
+
+        const wins = [
+            [0,1,2],[3,4,5],[6,7,8],
+            [0,3,6],[1,4,7],[2,5,8],
+            [0,4,8],[2,4,6]
+        ];
+
+        function updateStatus() {
+            if (!active) return;
+            statusEl.textContent = `Player ${current}'s turn`;
+        }
+
+        function checkWin() {
+            for (const combo of wins) {
+                const [a,b,c] = combo;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    return {winner: board[a], combo};
+                }
+            }
+            if (board.every(Boolean)) return {winner: null};
+            return null;
+        }
+
+        function render() {
+            cells.forEach((cell, i) => {
+                cell.textContent = board[i] || '';
+                cell.classList.remove('x','o','win');
+                if (board[i]) cell.classList.add(board[i].toLowerCase());
+            });
+            // Update device if connected
+            renderAllKeys();
+        }
+
+        async function makeMove(idx) {
+            if (!active || board[idx]) return;
+            board[idx] = current;
+            history.push({idx, player: current});
+            render();
+
+            const result = checkWin();
+            if (result) {
+                active = false;
+                if (result.winner) {
+                    statusEl.textContent = `Player ${result.winner} wins!`;
+                    // highlight winning cells
+                    result.combo.forEach(i => cells[i].classList.add('win'));
+                    // animate device winning cells (await so we can auto-reset after)
+                    try { await animateDeviceWin(result.combo, result.winner); } catch (e) { /* ignore */ }
+                } else {
+                    statusEl.textContent = `It's a draw.`;
+                    // animate device draw
+                    try { await animateDeviceDraw(); } catch (e) { /* ignore */ }
+                }
+
+                // short pause to let UI animations finish, then reset automatically
+                await sleep(700);
+                resetGame();
+                return;
+            }
+
+            // switch
+            current = current === 'X' ? 'O' : 'X';
+            updateStatus();
+            // reflect change on device
+            renderAllKeys();
+        }
+
+        // Click handler
+        boardEl.addEventListener('click', (e) => {
+            const cell = e.target.closest('.cell');
+            if (!cell) return;
+            const idx = Number(cell.dataset.index);
+            makeMove(idx);
+        });
+
+        function resetGame() {
+            board = Array(9).fill(null);
+            history = [];
+            startingPlayer = startingPlayer || 'X';
+            current = startingPlayer;
+            active = true;
+            render();
+            statusEl.textContent = `Player ${current}'s turn`;
+            renderAllKeys();
+        }
+
+        restartBtn.addEventListener('click', resetGame);
+
+        undoBtn.addEventListener('click', () => {
+            if (!history.length || !active) return;
+            const last = history.pop();
+            board[last.idx] = null;
+            current = last.player;
+            active = true;
+            render();
+            updateStatus();
+            renderAllKeys();
+        });
+
+        swapBtn.addEventListener('click', () => {
+            // swap which player starts next
+            startingPlayer = startingPlayer === 'X' ? 'O' : 'X';
+            current = startingPlayer;
+            board = Array(9).fill(null);
+            history = [];
+            active = true;
+            render();
+            statusEl.textContent = `Player ${current}'s turn`;
+            renderAllKeys();
+        });
+
+        // Initialize
+        render();
+        statusEl.textContent = `Player ${current}'s turn`;
+
+        // --- Device rendering helpers ---
+        async function renderKeyImage(index, opts = {}) {
+            // draw at 118x118 as device expects
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Background (allow override while animating)
+            ctx.fillStyle = opts.background || '#1e1e1e';
+            ctx.fillRect(0,0,size,size);
+
+            // border
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(4,4,size-8,size-8);
+
+            const val = board[index];
+            const pulse = typeof opts.pulse === 'number' ? opts.pulse : 0; // 0..1
+            const pulseColor = opts.pulseColor || null;
+
+            if (!val) {
+                // draw index number faint
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText((index+1).toString(), size/2, size/2);
+            } else if (val === 'X') {
+                // draw X
+                ctx.strokeStyle = '#ff6b6b';
+                ctx.lineWidth = 12;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(size*0.22, size*0.22);
+                ctx.lineTo(size*0.78, size*0.78);
+                ctx.moveTo(size*0.78, size*0.22);
+                ctx.lineTo(size*0.22, size*0.78);
+                ctx.stroke();
+            } else if (val === 'O') {
+                // draw O
+                ctx.strokeStyle = '#60a5fa';
+                ctx.lineWidth = 10;
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, size*0.28, 0, Math.PI*2);
+                ctx.stroke();
+            }
+
+            // pulse overlay when animating
+            if (pulse > 0 && pulseColor) {
+                ctx.fillStyle = hexToRgba(pulseColor, 0.25 * Math.min(1, pulse));
+                ctx.fillRect(0,0,size,size);
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx && typeof mx.setKeyImage === 'function') {
+                        try { await mx.setKeyImage(index, blob); } catch (err) { console.warn('setKeyImage failed', err); }
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        async function renderAllKeys() {
+            // If device not connected, skip
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for (let i=0;i<9;i++) tasks.push(renderKeyImage(i));
+            // fire-and-forget, but wait briefly so the browser schedules canvas work
+            await Promise.all(tasks);
+        }
+
+        // helper to convert hex to rgba
+        function hexToRgba(hex, a=1) {
+            if (!hex) return `rgba(0,184,252,${a})`;
+            hex = hex.replace('#','');
+            if (hex.length === 3) hex = hex.split('').map(h=>h+h).join('');
+            const num = parseInt(hex,16);
+            const r = (num>>16)&255; const g = (num>>8)&255; const b = num&255;
+            return `rgba(${r},${g},${b},${a})`;
+        }
+
+        // animate device on game over: pulse winning cells or all cells on draw
+        function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+        async function animateDeviceWin(combo, winner) {
+            if (!mx || !mx.device) return;
+            const color = winner === 'X' ? '#ff6b6b' : '#60a5fa';
+            const frames = 6;
+            for (let f=0; f<frames; f++) {
+                const t = f / (frames-1);
+                const pulse = 0.3 + 0.7 * Math.abs(Math.sin(t * Math.PI));
+                await Promise.all(combo.map(i => renderKeyImage(i, { pulse, pulseColor: color })));
+                await sleep(90);
+            }
+            // restore
+            await Promise.all(combo.map(i => renderKeyImage(i)));
+        }
+
+        async function animateDeviceDraw() {
+            if (!mx || !mx.device) return;
+            const color = '#cbd5e1';
+            const frames = 5;
+            const all = [...Array(9).keys()];
+            for (let f=0; f<frames; f++) {
+                const pulse = 0.25 + 0.75 * Math.abs(Math.sin((f/frames) * Math.PI*2));
+                await Promise.all(all.map(i => renderKeyImage(i, { pulse, pulseColor: color })));
+                await sleep(100);
+            }
+            await renderAllKeys();
+        }
+
+        // Allow pressing number keys 1-9 to play
+        window.addEventListener('keydown', (e) => {
+            if (!active) return;
+            const k = Number(e.key);
+            if (k >= 1 && k <= 9) {
+                makeMove(k - 1);
+            }
+            if (e.key === 'r' || e.key === 'R') restartBtn.click();
+            if (e.key === 'u' || e.key === 'U') undoBtn.click();
+            if (e.key === 's' || e.key === 'S') swapBtn.click();
+        });
+    </script>
+</body>
+
+</html>

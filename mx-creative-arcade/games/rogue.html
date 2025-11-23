@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Keypad Rogue — MX Creative Console</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --text: #ffffff;
+            --accent: #a855f7;
+            --hp: #ef4444;
+            --gold: #eab308;
+        }
+        body {
+            margin: 0;
+            font-family: 'Poppins', monospace, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            background: var(--panel);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            text-align: center;
+            width: 380px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        h1 { 
+            margin: 0 0 16px; 
+            font-size: 28px; 
+            color: var(--accent);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.3);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 18px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .stat-hp { color: var(--hp); }
+        .stat-gold { color: var(--gold); }
+        .stat-lvl { color: #a855f7; }
+
+        .view-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+            width: 340px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .cell {
+            width: 106px;
+            height: 106px;
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            user-select: none;
+            cursor: pointer;
+            position: relative;
+        }
+        .cell:hover { border-color: #555; }
+        .cell.player { border-color: #fff; background: #222; }
+        
+        .log {
+            height: 80px;
+            font-size: 13px;
+            color: #94a3b8;
+            overflow: hidden;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            font-family: monospace;
+        }
+        .log-msg { margin: 2px 0; }
+        .log-msg.bad { color: #f87171; }
+        .log-msg.good { color: #4ade80; }
+
+        .btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+        }
+        .btn.primary { background: var(--accent); color: #000; }
+        .btn:hover { transform: scale(1.05); }
+
+        /* Entity Styles for Web Grid */
+        .e-wall { color: #555; }
+        .e-floor { color: #222; font-size: 10px; }
+        .e-player { color: #fff; text-shadow: 0 0 10px #fff; }
+        .e-enemy { color: #ef4444; }
+        .e-potion { color: #f43f5e; }
+        .e-gold { color: #eab308; }
+        .e-stairs { color: #a855f7; }
+        
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Keypad Rogue</h1>
+        
+        <div class="stats">
+            <div class="stat-hp">HP: <span id="hpVal">20</span></div>
+            <div class="stat-gold">GP: <span id="goldVal">0</span></div>
+            <div class="stat-lvl">LVL: <span id="lvlVal">1</span></div>
+        </div>
+
+        <div class="view-grid" id="grid">
+            <!-- Generated 9 cells -->
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-msg">Welcome to the dungeon...</div>
+        </div>
+
+        <button id="connectBtn" class="btn primary">Connect Device</button>
+        <button id="restartBtn" class="btn" style="display:none">Restart</button>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        const gridEl = document.getElementById('grid');
+        const hpVal = document.getElementById('hpVal');
+        const goldVal = document.getElementById('goldVal');
+        const lvlVal = document.getElementById('lvlVal');
+        const logEl = document.getElementById('log');
+        const connectBtn = document.getElementById('connectBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // --- Game Constants ---
+        const MAP_W = 30;
+        const MAP_H = 30;
+        
+        const ENTITY = {
+            EMPTY: 0,
+            WALL: 1,
+            PLAYER: 2,
+            ENEMY: 3,
+            POTION: 4,
+            GOLD: 5,
+            STAIRS: 6
+        };
+
+        const ICONS = {
+            [ENTITY.EMPTY]: '·',
+            [ENTITY.WALL]: '🧱',
+            [ENTITY.PLAYER]: '🧙‍♂️',
+            [ENTITY.ENEMY]: '💀',
+            [ENTITY.POTION]: '🍷',
+            [ENTITY.GOLD]: '💰',
+            [ENTITY.STAIRS]: '🚪'
+        };
+        
+        const COLORS = {
+            [ENTITY.EMPTY]: '#18181b', // dark
+            [ENTITY.WALL]: '#3f3f46', // gray
+            [ENTITY.PLAYER]: '#ffffff',
+            [ENTITY.ENEMY]: '#7f1d1d', // dark red bg
+            [ENTITY.POTION]: '#881337', // pinkish
+            [ENTITY.GOLD]: '#713f12', // brownish gold
+            [ENTITY.STAIRS]: '#581c87' // purple
+        };
+
+        // Direction map for 3x3 keypad
+        // 0 1 2
+        // 3 4 5
+        // 6 7 8
+        const MOVES = {
+            0: {dx: -1, dy: -1}, 1: {dx: 0, dy: -1}, 2: {dx: 1, dy: -1},
+            3: {dx: -1, dy: 0},  4: {dx: 0, dy: 0},  5: {dx: 1, dy: 0},
+            6: {dx: -1, dy: 1},  7: {dx: 0, dy: 1},  8: {dx: 1, dy: 1}
+        };
+
+        // --- State ---
+        let map = [];
+        let entities = []; // Array of objects {x, y, type, hp, maxHp}
+        let player = { x: 1, y: 1, hp: 20, maxHp: 20, gold: 0, level: 1 };
+        let deviceConnected = false;
+        let isGameOver = false;
+
+        // --- Initialization ---
+
+        // Build UI Grid
+        for(let i=0; i<9; i++) {
+            const d = document.createElement('div');
+            d.className = 'cell';
+            d.dataset.i = i;
+            gridEl.appendChild(d);
+            
+            d.addEventListener('click', () => handleInput(i));
+        }
+        const cells = Array.from(document.querySelectorAll('.cell'));
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                if (await mx.connect()) {
+                    onConnected();
+                }
+            } catch(e) { alert(e); }
+        });
+
+        (async () => {
+            if(await mx.reconnect()) {
+                onConnected();
+            }
+        })();
+
+        function onConnected() {
+            deviceConnected = true;
+            connectBtn.style.display = 'none';
+            renderAllKeys();
+        }
+
+        restartBtn.addEventListener('click', initGame);
+
+        window.addEventListener('keydown', e => {
+            const k = parseInt(e.key);
+            if(k >= 1 && k <= 9) handleInput(k-1);
+        });
+
+        mx.addEventListener('keydown', e => {
+            const k = e.detail.key;
+            // Navigation
+            if (k === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+            handleInput(k);
+        });
+
+        // --- Logic ---
+
+        function initGame() {
+            player = { x: 1, y: 1, hp: 20, maxHp: 20, gold: 0, level: 1 };
+            isGameOver = false;
+            restartBtn.style.display = 'none';
+            generateLevel();
+            log("Entered level 1.");
+            updateUI();
+        }
+
+        function generateLevel() {
+            map = [];
+            entities = [];
+            // Fill walls
+            for(let y=0; y<MAP_H; y++) {
+                let row = [];
+                for(let x=0; x<MAP_W; x++) {
+                    row.push(ENTITY.WALL);
+                }
+                map.push(row);
+            }
+
+            // Simple Random Walk for rooms
+            let x = Math.floor(MAP_W/2);
+            let y = Math.floor(MAP_H/2);
+            player.x = x;
+            player.y = y;
+            map[y][x] = ENTITY.EMPTY;
+
+            let floorCount = 0;
+            const targetFloors = 300;
+
+            while(floorCount < targetFloors) {
+                const dir = Math.floor(Math.random() * 4); // 0:N, 1:E, 2:S, 3:W
+                if (dir===0) y--;
+                if (dir===1) x++;
+                if (dir===2) y++;
+                if (dir===3) x--;
+                
+                // Clamp
+                if(x < 1) x=1; if(x > MAP_W-2) x=MAP_W-2;
+                if(y < 1) y=1; if(y > MAP_H-2) y=MAP_H-2;
+
+                if (map[y][x] === ENTITY.WALL) {
+                    map[y][x] = ENTITY.EMPTY;
+                    floorCount++;
+                }
+            }
+
+            // Spawn things
+            // Enemies
+            spawnEntities(ENTITY.ENEMY, 10 + player.level * 2);
+            // Loot
+            spawnEntities(ENTITY.GOLD, 15);
+            spawnEntities(ENTITY.POTION, 5);
+            // Stairs
+            spawnEntities(ENTITY.STAIRS, 1);
+        }
+
+        function spawnEntities(type, count) {
+            for(let i=0; i<count; i++) {
+                let ex, ey;
+                do {
+                    ex = Math.floor(Math.random() * MAP_W);
+                    ey = Math.floor(Math.random() * MAP_H);
+                } while(map[ey][ex] !== ENTITY.EMPTY || (ex===player.x && ey===player.y) || getEntityAt(ex, ey));
+                
+                entities.push({ x: ex, y: ey, type: type, hp: type===ENTITY.ENEMY ? 10 + player.level*5 : 0 });
+            }
+        }
+
+        function getEntityAt(x, y) {
+            return entities.find(e => e.x === x && e.y === y);
+        }
+
+        function handleInput(keyIndex) {
+            if(isGameOver) return;
+            if(keyIndex === 4) {
+                // Wait / Skip turn
+                tick();
+                return;
+            }
+            if(keyIndex > 8) return;
+
+            const move = MOVES[keyIndex];
+            if(!move) return;
+
+            const tx = player.x + move.dx;
+            const ty = player.y + move.dy;
+
+            // Interaction Check
+            if (map[ty][tx] === ENTITY.WALL) {
+                log("Blocked.", 'bad');
+            } else {
+                const ent = getEntityAt(tx, ty);
+                if (ent) {
+                    interact(ent);
+                } else {
+                    // Move
+                    player.x = tx;
+                    player.y = ty;
+                }
+                tick();
+            }
+            updateUI();
+        }
+
+        function interact(ent) {
+            if (ent.type === ENTITY.ENEMY) {
+                // Attack
+                const dmg = Math.floor(Math.random() * 5) + 2;
+                ent.hp -= dmg;
+                log(`Hit enemy for ${dmg} dmg.`);
+                // Flash key?
+                if (ent.hp <= 0) {
+                    log("Enemy defeated! (+5 GP)", 'good');
+                    player.gold += 5;
+                    removeEntity(ent);
+                }
+            } else if (ent.type === ENTITY.POTION) {
+                player.hp = Math.min(player.maxHp, player.hp + 10);
+                log("Drank potion. (+10 HP)", 'good');
+                removeEntity(ent);
+            } else if (ent.type === ENTITY.GOLD) {
+                const amt = Math.floor(Math.random() * 10) + 5;
+                player.gold += amt;
+                log(`Found ${amt} gold.`, 'good');
+                removeEntity(ent);
+            } else if (ent.type === ENTITY.STAIRS) {
+                player.level++;
+                log(`Descended to level ${player.level}.`, 'good');
+                generateLevel();
+            }
+        }
+
+        function removeEntity(ent) {
+            const idx = entities.indexOf(ent);
+            if(idx > -1) entities.splice(idx, 1);
+        }
+
+        function tick() {
+            // Enemies turn
+            entities.forEach(e => {
+                if(e.type === ENTITY.ENEMY) {
+                    // Simple AI: If close, attack, else move random
+                    const dx = Math.abs(e.x - player.x);
+                    const dy = Math.abs(e.y - player.y);
+                    
+                    if (dx <= 1 && dy <= 1) {
+                        // Attack player
+                        const dmg = Math.floor(Math.random() * 3) + 1;
+                        player.hp -= dmg;
+                        log(`Enemy hits you for ${dmg}!`, 'bad');
+                        if(player.hp <= 0) {
+                            die();
+                        }
+                    }
+                }
+            });
+        }
+
+        function die() {
+            isGameOver = true;
+            log("YOU DIED.", 'bad');
+            restartBtn.style.display = 'inline-block';
+        }
+
+        function log(msg, type='') {
+            const el = document.createElement('div');
+            el.className = `log-msg ${type}`;
+            el.textContent = msg;
+            logEl.appendChild(el);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // --- Rendering ---
+
+        function updateUI() {
+            hpVal.textContent = player.hp;
+            goldVal.textContent = player.gold;
+            lvlVal.textContent = player.level;
+
+            // Render 3x3 view
+            for(let i=0; i<9; i++) {
+                const move = MOVES[i];
+                const cx = player.x + move.dx;
+                const cy = player.y + move.dy;
+                const cell = cells[i];
+
+                cell.innerHTML = '';
+                cell.className = 'cell';
+
+                if (i === 4) {
+                    cell.classList.add('player');
+                    cell.innerHTML = `<span class="e-player">${ICONS[ENTITY.PLAYER]}</span>`;
+                } else {
+                    // Bounds check
+                    if (cx < 0 || cx >= MAP_W || cy < 0 || cy >= MAP_H) {
+                        // Void
+                        cell.textContent = '';
+                    } else {
+                        // Content
+                        const ent = getEntityAt(cx, cy);
+                        if (ent) {
+                            const cls = getEntityClass(ent.type);
+                            cell.innerHTML = `<span class="${cls}">${ICONS[ent.type]}</span>`;
+                        } else {
+                            const tile = map[cy][cx];
+                            if (tile === ENTITY.WALL) {
+                                cell.innerHTML = `<span class="e-wall">${ICONS[ENTITY.WALL]}</span>`;
+                            } else {
+                                cell.innerHTML = `<span class="e-floor">${ICONS[ENTITY.EMPTY]}</span>`;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if(deviceConnected) renderAllKeys();
+        }
+        
+        function getEntityClass(type) {
+            if(type===ENTITY.ENEMY) return 'e-enemy';
+            if(type===ENTITY.GOLD) return 'e-gold';
+            if(type===ENTITY.POTION) return 'e-potion';
+            if(type===ENTITY.STAIRS) return 'e-stairs';
+            return '';
+        }
+
+        async function renderKeyImage(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Determine what is at this relative position
+            const move = MOVES[index];
+            const cx = player.x + move.dx;
+            const cy = player.y + move.dy;
+            
+            let bg = '#000';
+            let char = '';
+            let color = '#fff';
+            
+            if (index === 4) {
+                // Player center
+                bg = '#222';
+                char = ICONS[ENTITY.PLAYER];
+                color = '#fff';
+            } else if (cx < 0 || cx >= MAP_W || cy < 0 || cy >= MAP_H) {
+                 // Void
+                 bg = '#000';
+            } else {
+                const ent = getEntityAt(cx, cy);
+                if (ent) {
+                    char = ICONS[ent.type];
+                    if(ent.type === ENTITY.ENEMY) {
+                        bg = COLORS[ENTITY.ENEMY];
+                        color = '#fca5a5';
+                    } else if (ent.type === ENTITY.GOLD) {
+                        bg = COLORS[ENTITY.GOLD];
+                        color = '#fde047';
+                    } else if (ent.type === ENTITY.POTION) {
+                        bg = COLORS[ENTITY.POTION];
+                        color = '#fda4af';
+                    } else if (ent.type === ENTITY.STAIRS) {
+                        bg = COLORS[ENTITY.STAIRS];
+                        color = '#d8b4fe';
+                    }
+                } else {
+                    const tile = map[cy][cx];
+                    if (tile === ENTITY.WALL) {
+                        bg = COLORS[ENTITY.WALL];
+                        char = ''; 
+                    } else {
+                        bg = COLORS[ENTITY.EMPTY];
+                        char = ''; 
+                    }
+                }
+            }
+
+            // Draw
+            ctx.fillStyle = bg;
+            ctx.fillRect(0,0,size,size);
+            
+            // Wall texture
+            if (bg === COLORS[ENTITY.WALL]) {
+                ctx.strokeStyle = '#52525b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(10,10, size-20, size-20);
+                ctx.beginPath(); ctx.moveTo(10,10); ctx.lineTo(size-10, size-10); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(size-10,10); ctx.lineTo(10, size-10); ctx.stroke();
+            }
+
+            // Border
+            ctx.strokeStyle = index===4 ? '#fff' : 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = index===4 ? 4 : 2;
+            ctx.strokeRect(4,4,size-8,size-8);
+
+            // Icon
+            if (char) {
+                ctx.font = '60px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = color;
+                ctx.fillText(char, size/2, size/2);
+            }
+            
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx) {
+                        try { await mx.setKeyImage(index, blob); } catch (e) {}
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        async function renderAllKeys() {
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for(let i=0; i<9; i++) tasks.push(renderKeyImage(i));
+            await Promise.all(tasks);
+        }
+        
+        // Init
+        initGame();
+
+    </script>
+</body>
+</html>

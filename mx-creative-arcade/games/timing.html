@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Precision Timer — MX Creative Console</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --muted: #a0a0a0;
+            --accent: #00b8fc;
+            --p1-color: #ff6b6b;
+            --p2-color: #60a5fa;
+            --p3-color: #4ade80;
+            --p4-color: #facc15;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 40px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #fff, #ccc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+
+        /* Menu State */
+        .menu-screen {
+            display: none;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .menu-options {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+        }
+
+        .menu-card {
+            background: var(--panel);
+            border: 2px solid transparent;
+            border-radius: 20px;
+            padding: 32px;
+            width: 160px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .menu-card:hover, .menu-card.active {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+            background: #262626;
+        }
+
+        .menu-icon {
+            font-size: 48px;
+        }
+
+        .menu-label {
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .key-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-family: monospace;
+            color: var(--muted);
+        }
+
+        /* Game State */
+        .game-screen {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .center-timer {
+            font-size: 120px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            margin: 20px 0;
+            color: var(--accent);
+            text-shadow: 0 0 40px rgba(0, 184, 252, 0.3);
+            position: relative;
+        }
+
+        .timer-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--muted);
+            margin-top: -10px;
+            margin-bottom: 40px;
+        }
+
+        .players-grid {
+            display: grid;
+            gap: 24px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .players-grid.mode-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .players-grid.mode-4 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .player-card {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .player-card.p1 { border-color: rgba(255, 107, 107, 0.2); }
+        .player-card.p2 { border-color: rgba(96, 165, 250, 0.2); }
+        .player-card.p3 { border-color: rgba(74, 222, 128, 0.2); }
+        .player-card.p4 { border-color: rgba(250, 204, 21, 0.2); }
+
+        .player-card.active {
+            background: #2a2a2a;
+        }
+
+        .player-card.holding.p1 { background: var(--p1-color); color: #000; border-color: var(--p1-color); box-shadow: 0 0 30px rgba(255, 107, 107, 0.4); }
+        .player-card.holding.p2 { background: var(--p2-color); color: #000; border-color: var(--p2-color); box-shadow: 0 0 30px rgba(96, 165, 250, 0.4); }
+        .player-card.holding.p3 { background: var(--p3-color); color: #000; border-color: var(--p3-color); box-shadow: 0 0 30px rgba(74, 222, 128, 0.4); }
+        .player-card.holding.p4 { background: var(--p4-color); color: #000; border-color: var(--p4-color); box-shadow: 0 0 30px rgba(250, 204, 21, 0.4); }
+
+        .player-card.busted {
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        .player-card.winner {
+            transform: scale(1.1);
+            z-index: 10;
+            border-color: #fff;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.3);
+        }
+
+        .p-name {
+            font-weight: 600;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .p-status {
+            font-size: 24px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .p-hint {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 4px;
+        }
+
+        .message {
+            position: fixed;
+            bottom: 40px;
+            font-size: 18px;
+            color: var(--muted);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .connect-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* States */
+        body[data-state="menu"] .menu-screen { display: flex; }
+        body[data-state="game"] .game-screen { display: flex; }
+        body[data-state="result"] .game-screen { display: flex; }
+
+    </style>
+</head>
+
+<body data-state="menu">
+    <button id="connectBtn" class="connect-btn">Connect Device</button>
+
+    <div class="container">
+        <h1>Precision Timer</h1>
+        <div class="subtitle">Release close to the target time</div>
+
+        <!-- Menu -->
+        <div class="menu-screen">
+            <div class="menu-options">
+                <div class="menu-card" id="mode2Btn">
+                    <div class="key-badge">KEY 4</div>
+                    <div class="menu-icon">👥</div>
+                    <div class="menu-label">2 Players</div>
+                </div>
+                <div class="menu-card" id="timerToggleBtn">
+                    <div class="key-badge">KEY 5</div>
+                    <div class="menu-icon">👁️</div>
+                    <div class="menu-label">Timer: ON</div>
+                </div>
+                <div class="menu-card" id="mode4Btn">
+                    <div class="key-badge">KEY 6</div>
+                    <div class="menu-icon">👥👥</div>
+                    <div class="menu-label">4 Players</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game -->
+        <div class="game-screen">
+            <div class="center-timer" id="mainTimer">0.000</div>
+            <div class="timer-label">Target Time</div>
+            
+            <div class="players-grid" id="playersGrid">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <div class="message" id="message">Select a mode to start</div>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        const connectBtn = document.getElementById('connectBtn');
+        const body = document.body;
+        const mainTimer = document.getElementById('mainTimer');
+        const playersGrid = document.getElementById('playersGrid');
+        const messageEl = document.getElementById('message');
+
+        // Game State
+        let state = 'menu'; // menu, ready, playing, result
+        let mode = 2; // 2 or 4
+        let targetTime = 5.000;
+        let startTime = 0;
+        let gameLoop = null;
+        let countdownVal = null;
+        let showTimer = true;
+        
+        // Player State
+        // 2P: keys 4, 6 -> indices 3, 5
+        // 4P: keys 1, 3, 7, 9 -> indices 0, 2, 6, 8
+        let players = [];
+
+        const CONFIG_2P = [
+            { id: 1, keyIndex: 3, name: 'Player 1', color: '#ff6b6b', displayKey: '4' },
+            { id: 2, keyIndex: 5, name: 'Player 2', color: '#60a5fa', displayKey: '6' }
+        ];
+
+        const CONFIG_4P = [
+            { id: 1, keyIndex: 0, name: 'Player 1', color: '#ff6b6b', displayKey: '1' },
+            { id: 2, keyIndex: 2, name: 'Player 2', color: '#60a5fa', displayKey: '3' },
+            { id: 3, keyIndex: 6, name: 'Player 3', color: '#4ade80', displayKey: '7' },
+            { id: 4, keyIndex: 8, name: 'Player 4', color: '#facc15', displayKey: '9' }
+        ];
+
+        // --- Connection Handling ---
+        connectBtn.addEventListener('click', async () => {
+            try { await mx.connect(); } catch (e) { console.error(e); }
+        });
+
+        mx.reconnect();
+
+        mx.addEventListener('connected', () => {
+            connectBtn.textContent = 'Connected';
+            connectBtn.style.borderColor = '#4ade80';
+            connectBtn.style.color = '#4ade80';
+            renderDevice();
+        });
+
+        mx.addEventListener('keydown', (e) => {
+            const k = e.detail.key;
+
+            if (k === 9) { // Back
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            if (state === 'menu') {
+                if (k === 3) selectMode(2); // Key 4
+                if (k === 5) selectMode(4); // Key 6
+                if (k === 4) toggleTimer(); // Key 5 (Center)
+            } else if (state === 'ready') {
+                handlePlayerPress(k, true);
+            } else if (state === 'playing') {
+                // No op, waiting for release
+            } else if (state === 'result') {
+                resetToMenu();
+            }
+        });
+
+        mx.addEventListener('keyup', (e) => {
+            const k = e.detail.key;
+            if (state === 'ready') {
+                handlePlayerPress(k, false);
+            } else if (state === 'playing') {
+                handlePlayerRelease(k);
+            }
+        });
+
+        // --- Game Logic ---
+
+        function toggleTimer() {
+            showTimer = !showTimer;
+            const btn = document.getElementById('timerToggleBtn');
+            if (btn) {
+                btn.querySelector('.menu-icon').textContent = showTimer ? '👁️' : '🙈';
+                btn.querySelector('.menu-label').textContent = showTimer ? 'Timer: ON' : 'Timer: OFF';
+            }
+            renderDevice();
+        }
+
+        function selectMode(m) {
+            mode = m;
+            const config = mode === 2 ? CONFIG_2P : CONFIG_4P;
+            
+            // Initialize Players
+            players = config.map(c => ({
+                ...c,
+                holding: false,
+                finished: false,
+                time: 0,
+                busted: false
+            }));
+
+            // UI Setup
+            playersGrid.className = `players-grid mode-${mode}`;
+            playersGrid.innerHTML = players.map((p, i) => `
+                <div class="player-card p${p.id}" id="p${i}">
+                    <div class="p-name">${p.name}</div>
+                    <div class="p-status" id="p${i}-status">HOLD</div>
+                    <div class="p-hint">KEY ${p.displayKey}</div>
+                </div>
+            `).join('');
+
+            // Setup Game
+            targetTime = (Math.floor(Math.random() * 500) + 500) / 100; // 5.00 to 9.99
+            mainTimer.textContent = targetTime.toFixed(3);
+            
+            setState('ready');
+        }
+
+        function setState(s) {
+            state = s;
+            body.dataset.state = (s === 'ready' || s === 'playing') ? 'game' : s;
+            
+            if (s === 'menu') {
+                messageEl.textContent = "Select a mode to start";
+            } else if (s === 'ready') {
+                messageEl.textContent = "Hold your button to start!";
+                resetPlayersUI();
+            } else if (s === 'playing') {
+                messageEl.textContent = "Release at the target!";
+            } else if (s === 'result') {
+                messageEl.textContent = "Press any key to restart";
+            }
+            
+            renderDevice();
+        }
+
+        let countdownInterval = null;
+
+        function handlePlayerPress(keyIndex, isDown) {
+            const pIndex = players.findIndex(p => p.keyIndex === keyIndex);
+            if (pIndex === -1) return;
+
+            players[pIndex].holding = isDown;
+            updatePlayerUI(pIndex);
+            renderDevice();
+
+            if (isDown) {
+                // Check start
+                if (players.every(p => p.holding) && !countdownInterval) {
+                    startCountdown();
+                }
+            } else {
+                // Abort start if counting down
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    messageEl.textContent = "Hold button to start!";
+                }
+            }
+        }
+
+        function startCountdown() {
+            let count = 3;
+            countdownVal = count;
+            messageEl.textContent = `Starting in ${count}...`;
+            renderDevice();
+            
+            countdownInterval = setInterval(() => {
+                count--;
+                countdownVal = count;
+                if (count > 0) {
+                    messageEl.textContent = `Starting in ${count}...`;
+                    renderDevice();
+                } else {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    countdownVal = null;
+                    renderDevice();
+                    startGame();
+                }
+            }, 800);
+        }
+
+        function startGame() {
+            setState('playing');
+            startTime = performance.now();
+            messageEl.textContent = "Wait for it...";
+            
+            // Hide current time? Or show it?
+            // Requirement: "Time at center... keep button pressed maximum without passing"
+            // I'll keep the Target Time visible. The elapsed time is hidden (internal).
+            // Players must estimate.
+
+            // Loop to check if everyone released or time limit passed massive amount
+            gameLoop = requestAnimationFrame(updateGame);
+            
+            // Start updating device timer periodically (e.g. every 100ms)
+            // Updating every frame is too much for HID bandwidth
+            startDeviceTimerUpdate();
+        }
+
+        let deviceTimerInterval = null;
+        let lastDeviceTime = 0;
+
+        function startDeviceTimerUpdate() {
+            if (deviceTimerInterval) clearInterval(deviceTimerInterval);
+            deviceTimerInterval = setInterval(() => {
+                if (state !== 'playing') {
+                    stopDeviceTimerUpdate();
+                    return;
+                }
+                const now = performance.now();
+                const elapsed = (now - startTime) / 1000;
+                // Only update if time changed significantly to avoid jitter, though here we want smooth-ish
+                renderKey(4, -1); // Update center key only
+            }, 100); // 10 FPS update on device is sufficient for reading
+        }
+
+        function stopDeviceTimerUpdate() {
+            if (deviceTimerInterval) {
+                clearInterval(deviceTimerInterval);
+                deviceTimerInterval = null;
+            }
+        }
+
+        function handlePlayerRelease(keyIndex) {
+            const pIndex = players.findIndex(p => p.keyIndex === keyIndex);
+            if (pIndex === -1 || players[pIndex].finished) return;
+
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000;
+
+            players[pIndex].finished = true;
+            players[pIndex].time = elapsed;
+            players[pIndex].holding = false;
+
+            // Check busted
+            if (elapsed > targetTime) {
+                players[pIndex].busted = true;
+            }
+
+            updatePlayerUI(pIndex);
+            renderDevice();
+
+            if (players.every(p => p.finished)) {
+                endGame();
+            }
+        }
+
+        function updateGame() {
+            if (state !== 'playing') return;
+
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000;
+
+            // Auto-bust if WAY over (e.g. target + 5s)
+            if (elapsed > targetTime + 5) {
+                // Force finish anyone still holding
+                players.forEach((p, i) => {
+                    if (!p.finished) {
+                        p.finished = true;
+                        p.time = elapsed;
+                        p.busted = true;
+                        p.holding = false;
+                        updatePlayerUI(i);
+                    }
+                });
+                endGame();
+                return;
+            }
+
+            gameLoop = requestAnimationFrame(updateGame);
+        }
+
+        function endGame() {
+            cancelAnimationFrame(gameLoop);
+            stopDeviceTimerUpdate();
+            setState('result');
+
+            // Determine winner
+            // Winner is non-busted player with time closest to target (highest time <= target)
+            const validPlayers = players.filter(p => !p.busted);
+            let winnerIndex = -1;
+
+            if (validPlayers.length > 0) {
+                // Sort by time descending (closest to target)
+                validPlayers.sort((a, b) => b.time - a.time);
+                const winnerId = validPlayers[0].id;
+                winnerIndex = players.findIndex(p => p.id === winnerId);
+                
+                messageEl.textContent = `${players[winnerIndex].name} Wins!`;
+                document.getElementById(`p${winnerIndex}`).classList.add('winner');
+            } else {
+                messageEl.textContent = "Everyone Busted!";
+            }
+            
+            renderDevice(winnerIndex);
+        }
+
+        function resetToMenu() {
+            setState('menu');
+        }
+
+        // --- UI Helpers ---
+
+        function updatePlayerUI(index) {
+            const p = players[index];
+            const el = document.getElementById(`p${index}`);
+            const status = document.getElementById(`p${index}-status`);
+
+            if (state === 'ready') {
+                el.classList.toggle('holding', p.holding);
+                status.textContent = p.holding ? "READY" : "WAITING";
+            } else if (state === 'playing') {
+                el.classList.toggle('holding', p.holding);
+                if (p.finished) {
+                    status.textContent = p.busted ? "BUST" : p.time.toFixed(3);
+                    if (p.busted) el.classList.add('busted');
+                } else {
+                    status.textContent = "...";
+                }
+            } else if (state === 'result') {
+                status.textContent = p.busted ? "BUST" : p.time.toFixed(3);
+                if (p.busted) el.classList.add('busted');
+                el.classList.remove('holding');
+            }
+        }
+
+        function resetPlayersUI() {
+            players.forEach((p, i) => {
+                const el = document.getElementById(`p${i}`);
+                const status = document.getElementById(`p${i}-status`);
+                el.className = `player-card p${p.id}`;
+                status.textContent = "WAITING";
+            });
+        }
+
+        // --- Device Rendering ---
+
+        async function renderDevice(winnerIndex = -1) {
+            if (!mx || !mx.device) return;
+
+            const tasks = [];
+            for (let i = 0; i < 9; i++) {
+                tasks.push(renderKey(i, winnerIndex));
+            }
+            await Promise.all(tasks);
+        }
+
+        async function renderKey(index, winnerIndex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 118;
+            canvas.height = 118;
+            const ctx = canvas.getContext('2d');
+
+            // Background
+            ctx.fillStyle = '#1e1e1e';
+            ctx.fillRect(0, 0, 118, 118);
+
+            if (state === 'menu') {
+                // Render Menu Icons
+                if (index === 3) drawMenuIcon(ctx, '2P'); // Key 4
+                else if (index === 5) drawMenuIcon(ctx, '4P'); // Key 6
+                else if (index === 4) drawMenuIcon(ctx, showTimer ? '👁️' : '🙈', true); // Key 5
+                else {
+                    // Dim
+                    ctx.fillStyle = '#111';
+                    ctx.fillRect(0,0,118,118);
+                }
+            } else {
+                // Game Mode
+                const p = players.find(p => p.keyIndex === index);
+                if (p) {
+                    // Player Key
+                    const isWinner = winnerIndex !== -1 && players[winnerIndex] === p;
+                    
+                    // Base color
+                    ctx.fillStyle = '#333';
+                    if (p.holding) ctx.fillStyle = p.color;
+                    if (p.finished && !p.busted) ctx.fillStyle = '#222'; // Dim if done
+                    if (p.busted) ctx.fillStyle = '#300'; // Red-ish dark
+                    if (isWinner) ctx.fillStyle = p.color; // Bright again
+
+                    ctx.fillRect(4, 4, 110, 110);
+                    
+                    // Text or Status
+                    ctx.fillStyle = (p.holding || isWinner) ? '#000' : p.color;
+                    ctx.font = 'bold 30px Poppins';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    if (state === 'result') {
+                         if (isWinner) ctx.fillText("WIN", 59, 59);
+                         else if (p.busted) ctx.fillText("BUST", 59, 59);
+                         else ctx.fillText(p.time.toFixed(2), 59, 59);
+                    } else {
+                         ctx.fillText(`P${p.id}`, 59, 59);
+                    }
+
+                } else {
+                    // Blank keys OR Countdown/Timer Center
+                    if (index === 4) {
+                        if (countdownVal !== null) {
+                            // Draw Countdown
+                            ctx.fillStyle = '#000';
+                            ctx.fillRect(0,0,118,118);
+                            
+                            ctx.fillStyle = '#00b8fc'; // Accent color
+                            ctx.font = 'bold 80px Poppins';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(countdownVal.toString(), 59, 62);
+                        } else if (state === 'playing') {
+                            // Draw Running Time
+                            ctx.fillStyle = '#000';
+                            ctx.fillRect(0,0,118,118);
+                            
+                            if (showTimer) {
+                                const now = performance.now();
+                                const elapsed = (now - startTime) / 1000;
+                                
+                                ctx.fillStyle = '#fff';
+                                ctx.font = 'bold 32px Poppins'; // Smaller font for precision
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(elapsed.toFixed(2), 59, 62); // Show 2 decimals
+                            } else {
+                                // Blind Mode Icon
+                                ctx.fillStyle = '#333';
+                                ctx.font = '40px Poppins';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText('🙈', 59, 62);
+                            }
+                        } else {
+                             // Blank
+                            ctx.fillStyle = '#000';
+                            ctx.fillRect(0,0,118,118);
+                        }
+                    } else {
+                        // Blank
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0,0,118,118);
+                    }
+                }
+            }
+
+            // Border
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0,0,118,118);
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob) {
+                        try { await mx.setKeyImage(index, blob); } catch (e) {}
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.8);
+            });
+        }
+
+        function drawMenuIcon(ctx, text, isEmoji = false) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(10, 10, 98, 98);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = isEmoji ? '40px Poppins' : 'bold 40px Poppins';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 59, 59);
+        }
+
+        // Keyboard fallback for debug
+        window.addEventListener('keydown', (e) => {
+            const map = {
+                '4': 3, // P1 (2P)
+                '6': 5, // P2 (2P)
+                '1': 0, // P1 (4P)
+                '3': 2, // P2 (4P)
+                '7': 6, // P3 (4P)
+                '9': 8, // P4 (4P)
+            };
+            
+            if (map[e.key] !== undefined) {
+                // Simulate device event
+                mx.dispatchEvent(new CustomEvent('keydown', { detail: { key: map[e.key] } }));
+            }
+            
+            if (state === 'ready' || state === 'playing') {
+                 if (e.key === ' ') {
+                     // Debug trigger all? No, individual
+                 }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+             const map = {
+                '4': 3,
+                '6': 5,
+                '1': 0,
+                '3': 2,
+                '7': 6,
+                '9': 8,
+            };
+            if (map[e.key] !== undefined) {
+                mx.dispatchEvent(new CustomEvent('keyup', { detail: { key: map[e.key] } }));
+            }
+        });
+
+    </script>
+</body>
+</html>
+
