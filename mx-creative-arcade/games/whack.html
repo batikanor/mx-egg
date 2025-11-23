@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Whack-a-Sprite — MX Creative Console</title>
@@ -14,6 +15,7 @@
             --accent: #00b8fc;
             --text: #ffffff;
         }
+
         body {
             margin: 0;
             font-family: 'Poppins', sans-serif;
@@ -26,19 +28,24 @@
             height: 100vh;
             overflow: hidden;
         }
-        
+
         .container {
             background: var(--panel);
             padding: 24px;
             border-radius: 16px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
             text-align: center;
             width: 360px;
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        h1 { margin: 0 0 16px; color: #fff; font-size: 28px; font-weight: 700; }
-        
+        h1 {
+            margin: 0 0 16px;
+            color: #fff;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
         .stats {
             display: flex;
             justify-content: space-between;
@@ -46,12 +53,18 @@
             font-size: 24px;
             font-weight: bold;
             font-family: monospace;
-            background: rgba(0,0,0,0.2);
+            background: rgba(0, 0, 0, 0.2);
             padding: 10px 16px;
             border-radius: 8px;
         }
-        .score { color: #4ade80; }
-        .time { color: #facc15; }
+
+        .score {
+            color: #4ade80;
+        }
+
+        .time {
+            color: #facc15;
+        }
 
         .grid {
             display: grid;
@@ -59,12 +72,12 @@
             gap: 10px;
             margin-bottom: 20px;
         }
-        
+
         .cell {
             width: 100px;
             height: 100px;
-            background: rgba(255,255,255,0.03);
-            border: 2px solid rgba(255,255,255,0.06);
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.06);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -74,11 +87,25 @@
             transition: transform 0.1s;
             user-select: none;
         }
-        .cell:active { transform: scale(0.95); }
-        
-        .goblin { background: rgba(74, 222, 128, 0.2); border-color: #4ade80; }
-        .bomb { background: rgba(248, 113, 113, 0.2); border-color: #f87171; }
-        .coin { background: rgba(250, 204, 21, 0.2); border-color: #facc15; }
+
+        .cell:active {
+            transform: scale(0.95);
+        }
+
+        .goblin {
+            background: rgba(74, 222, 128, 0.2);
+            border-color: #4ade80;
+        }
+
+        .bomb {
+            background: rgba(248, 113, 113, 0.2);
+            border-color: #f87171;
+        }
+
+        .coin {
+            background: rgba(250, 204, 21, 0.2);
+            border-color: #facc15;
+        }
 
         .btn {
             background: var(--accent);
@@ -92,16 +119,24 @@
             font-family: 'Poppins', sans-serif;
             transition: transform 0.2s;
         }
-        .btn:hover { transform: scale(1.05); }
-        .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
 
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: default;
+            transform: none;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="container">
         <h1>Whack-a-Sprite</h1>
-        
+
         <div class="stats">
             <div class="score">PTS: <span id="scoreVal">0</span></div>
             <div class="time">TIME: <span id="timeVal">30</span></div>
@@ -141,7 +176,7 @@
         const GAME_DURATION = 30;
         const SPAWN_RATE_MIN = 400;
         const SPAWN_RATE_MAX = 800;
-        
+
         // Types
         const TYPES = {
             NONE: 0,
@@ -168,12 +203,12 @@
                     renderAllKeys();
                     startGame();
                 }
-            } catch(e) { alert(e); }
+            } catch (e) { alert(e); }
         });
 
         // Try auto-connect
         (async () => {
-            if(await mx.reconnect()) {
+            if (await mx.reconnect()) {
                 deviceConnected = true;
                 connectBtn.style.display = 'none';
                 renderAllKeys();
@@ -183,7 +218,7 @@
 
         // Allow keyboard/click play without device for testing
         setTimeout(() => {
-            if(!deviceConnected && startBtn.style.display === 'none') {
+            if (!deviceConnected && startBtn.style.display === 'none') {
                 startBtn.style.display = 'inline-block';
                 startBtn.textContent = "Play (No Device)";
             }
@@ -193,20 +228,20 @@
 
         gridEl.addEventListener('mousedown', e => {
             const cell = e.target.closest('.cell');
-            if(cell) whack(parseInt(cell.dataset.i));
+            if (cell) whack(parseInt(cell.dataset.i));
         });
 
         // Keyboard 1-9
         window.addEventListener('keydown', e => {
-            if(!isPlaying) return;
+            if (!isPlaying) return;
             const k = parseInt(e.key);
-            if(k >= 1 && k <= 9) whack(k-1);
+            if (k >= 1 && k <= 9) whack(k - 1);
         });
 
         // MX Input
         mx.addEventListener('keydown', e => {
             const k = e.detail.key;
-            
+
             // Navigation: Left Button -> Hub
             if (k === 9) {
                 localStorage.setItem('lastGame', window.location.href);
@@ -214,27 +249,27 @@
                 return;
             }
 
-            if(isPlaying) whack(k);
+            if (isPlaying) whack(k);
         });
 
         // --- Game Logic ---
 
         function startGame() {
-            if(isPlaying) return;
+            if (isPlaying) return;
             isPlaying = true;
             score = 0;
             timeLeft = GAME_DURATION;
             gridState = new Array(9).fill(null);
-            
+
             updateUI();
             startBtn.style.display = 'none';
             startBtn.disabled = true;
-            
+
             let lastTime = performance.now();
             let spawnTimer = 0;
 
             gameLoopId = requestAnimationFrame(function loop(now) {
-                if(!isPlaying) return;
+                if (!isPlaying) return;
                 const dt = now - lastTime;
                 lastTime = now;
 
@@ -257,8 +292,8 @@
                 // Despawning
                 const currentTime = Date.now();
                 let changed = false;
-                for(let i=0; i<9; i++) {
-                    if(gridState[i] && currentTime > gridState[i].despawnTime) {
+                for (let i = 0; i < 9; i++) {
+                    if (gridState[i] && currentTime > gridState[i].despawnTime) {
                         gridState[i] = null;
                         changed = true;
                     }
@@ -272,10 +307,10 @@
         function spawnEntity() {
             // Find empty slots
             const empty = gridState.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
-            if(empty.length === 0) return;
+            if (empty.length === 0) return;
 
             const idx = empty[Math.floor(Math.random() * empty.length)];
-            
+
             // Decide Type
             const rand = Math.random();
             let type = TYPES.GOBLIN;
@@ -300,7 +335,7 @@
                 type: type,
                 despawnTime: Date.now() + duration
             };
-            
+
             updateUI(true); // Force render
         }
 
@@ -320,7 +355,7 @@
                 score -= 5;
                 flashKey(idx, '#f87171');
             }
-            
+
             updateUI(true);
         }
 
@@ -359,13 +394,13 @@
                 }
             });
 
-            if(renderKeys && deviceConnected) {
+            if (renderKeys && deviceConnected) {
                 renderAllKeys();
             }
         }
 
         // Device Rendering
-        
+
         const flashState = {}; // idx -> {color, end}
 
         function flashKey(idx, color) {
@@ -377,7 +412,7 @@
         async function renderAllKeys() {
             if (!mx || !mx.device) return;
             const tasks = [];
-            for(let i=0; i<9; i++) tasks.push(renderKeyImage(i));
+            for (let i = 0; i < 9; i++) tasks.push(renderKeyImage(i));
             await Promise.all(tasks);
         }
 
@@ -394,39 +429,39 @@
 
             if (isFlashing) {
                 ctx.fillStyle = flash.color;
-                ctx.fillRect(0,0,size,size);
+                ctx.fillRect(0, 0, size, size);
             } else {
                 const item = gridState[index];
-                
+
                 // Bg
                 ctx.fillStyle = '#111111'; // Dark bg
-                ctx.fillRect(0,0,size,size);
-                
+                ctx.fillRect(0, 0, size, size);
+
                 // Border
                 ctx.strokeStyle = 'rgba(255,255,255,0.1)';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(4,4,size-8,size-8);
+                ctx.strokeRect(4, 4, size - 8, size - 8);
 
                 if (item) {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = '60px Arial';
-                    
+
                     if (item.type === TYPES.GOBLIN) {
                         ctx.fillStyle = 'rgba(74, 222, 128, 0.1)';
-                        ctx.fillRect(4,4,size-8,size-8);
+                        ctx.fillRect(4, 4, size - 8, size - 8);
                         ctx.fillStyle = '#4ade80'; // Green
-                        ctx.fillText('👺', size/2, size/2);
+                        ctx.fillText('👺', size / 2, size / 2);
                     } else if (item.type === TYPES.BOMB) {
                         ctx.fillStyle = 'rgba(248, 113, 113, 0.1)';
-                        ctx.fillRect(4,4,size-8,size-8);
+                        ctx.fillRect(4, 4, size - 8, size - 8);
                         ctx.fillStyle = '#f87171'; // Red
-                        ctx.fillText('💣', size/2, size/2);
+                        ctx.fillText('💣', size / 2, size / 2);
                     } else if (item.type === TYPES.COIN) {
                         ctx.fillStyle = 'rgba(250, 204, 21, 0.1)';
-                        ctx.fillRect(4,4,size-8,size-8);
+                        ctx.fillRect(4, 4, size - 8, size - 8);
                         ctx.fillStyle = '#facc15'; // Yellow
-                        ctx.fillText('💰', size/2, size/2);
+                        ctx.fillText('💰', size / 2, size / 2);
                     }
                 }
             }
@@ -434,7 +469,7 @@
             return new Promise(resolve => {
                 canvas.toBlob(async (blob) => {
                     if (blob && mx && typeof mx.setKeyImage === 'function') {
-                        try { await mx.setKeyImage(index, blob); } catch (e) {}
+                        try { await mx.setKeyImage(index, blob); } catch (e) { }
                     }
                     resolve();
                 }, 'image/jpeg', 0.9);
@@ -443,4 +478,5 @@
 
     </script>
 </body>
+
 </html>

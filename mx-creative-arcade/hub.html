@@ -507,6 +507,17 @@
 
         function updateActivePageIndicator() {
             // Show key hints only for current page
+            // Scroll to the active page
+            if (currentPage === 0) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                const startIdx = currentPage * pageSize;
+                const targetCard = document.getElementById(`game${startIdx + 1}`);
+                if (targetCard) {
+                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+
             // Also maybe highlight the active "page" of cards?
             // For simplicity, we just update the Key Hints (1-9) on the cards
             // that correspond to the currently active device page.
@@ -537,50 +548,80 @@
         }
 
         async function renderMenu() {
-            // Render even if device is not connected, so VC updates
-            // if (!mx || !mx.device) return;
+            const size = 118;
+            const gap = 40;
+            const fullSize = 434; // 3 * 118 + 2 * 40 = 354 + 80 = 434
 
-            // If we have pages, maybe indicate that? 
-            // The paging buttons (physical) are separate from the LCDs.
+            const masterCanvas = document.createElement('canvas');
+            masterCanvas.width = fullSize;
+            masterCanvas.height = fullSize;
+            const ctx = masterCanvas.getContext('2d');
+
+            // Fill Background (Black for gaps)
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, fullSize, fullSize);
 
             const tasks = [];
             for (let i = 0; i < 9; i++) {
                 const gameIndex = currentPage * pageSize + i;
+                const row = Math.floor(i / 3);
+                const col = i % 3;
+                const x = col * (size + gap);
+                const y = row * (size + gap);
+
                 if (gameIndex < games.length) {
-                    tasks.push(renderIcon(i, games[gameIndex]));
+                    tasks.push(drawIcon(ctx, x, y, games[gameIndex]));
                 } else {
-                    tasks.push(renderBlank(i));
+                    tasks.push(drawBlank(ctx, x, y));
                 }
             }
             await Promise.all(tasks);
+
+            // Convert to Blob
+            const blob = await new Promise(resolve => masterCanvas.toBlob(resolve, 'image/jpeg', 0.9));
+
+            // Send to device (3 times for redundancy)
+            if (mx) {
+                if (mx.device) {
+                    for (let k = 0; k < 3; k++) {
+                        try {
+                            await mx.setSheetImage(blob);
+                        } catch (e) { console.warn(e); }
+                    }
+                } else {
+                    // Update Virtual Console even if not connected
+                    mx.dispatchEvent(new CustomEvent('keyimage', {
+                        detail: {
+                            keyIndex: -1,
+                            imageBlob: blob
+                        }
+                    }));
+                }
+            }
         }
 
-        async function renderIcon(index, game) {
+        async function drawIcon(ctx, x, y, game) {
             const size = 118;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
 
             // Modern clean icon style for device
             ctx.fillStyle = '#1e1e1e'; // Match surface
-            ctx.fillRect(0, 0, size, size);
+            ctx.fillRect(x, y, size, size);
 
             // Border
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 1;
-            ctx.strokeRect(0, 0, size, size); // Full bleed? No, keep inner
+            ctx.strokeRect(x, y, size, size);
 
             // Inner Accent Border
             ctx.strokeStyle = game.color;
             ctx.lineWidth = 3;
-            ctx.strokeRect(4, 4, size - 8, size - 8);
+            ctx.strokeRect(x + 4, y + 4, size - 8, size - 8);
 
             if (game.title === 'MX Simon') {
                 // Special 4-color Simon Icon rendering for Canvas
                 const r = 25;
-                const cx = size / 2;
-                const cy = size / 2;
+                const cx = x + size / 2;
+                const cy = y + size / 2;
 
                 // Top Left - Green
                 ctx.fillStyle = '#4ade80';
@@ -602,40 +643,21 @@
                 img.src = game.icon;
                 await new Promise(r => { img.onload = r; img.onerror = r; });
                 const iconSize = 80;
-                ctx.drawImage(img, (size - iconSize) / 2, (size - iconSize) / 2, iconSize, iconSize);
+                ctx.drawImage(img, x + (size - iconSize) / 2, y + (size - iconSize) / 2, iconSize, iconSize);
             } else {
                 // Icon
                 ctx.font = '50px Poppins, Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#fff';
-                ctx.fillText(game.icon, size / 2, size / 2);
+                ctx.fillText(game.icon, x + size / 2, y + size / 2);
             }
-
-            return sendToDevice(index, canvas);
         }
 
-        async function renderBlank(index) {
+        async function drawBlank(ctx, x, y) {
             const size = 118;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-
             ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, size, size);
-            return sendToDevice(index, canvas);
-        }
-
-        function sendToDevice(index, canvas) {
-            return new Promise(resolve => {
-                canvas.toBlob(async (blob) => {
-                    if (blob && mx) {
-                        try { await mx.setKeyImage(index, blob); } catch (e) { }
-                    }
-                    resolve();
-                }, 'image/jpeg', 0.9);
-            });
+            ctx.fillRect(x, y, size, size);
         }
     </script>
 </body>
