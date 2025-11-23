@@ -15,7 +15,9 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import StrategyPanel from './StrategyPanel';
-import { predictBallTrajectory, predictPlayerTrajectory, analyzeInterception } from '../utils/trajectoryPredictor';
+import { predictBallTrajectory, getActiveAlgorithmName, isCustomAlgorithmActive, clearCustomAlgorithm } from '../utils/trajectoryPredictorWrapper';
+import { predictPlayerTrajectory, analyzeInterception } from '../utils/trajectoryPredictor';
+import Link from 'next/link';
 
 const Field3D = dynamic(() => import('./Field3D'), { ssr: false });
 const PlayerPOV = dynamic(() => import('./PlayerPOV'), { ssr: false });
@@ -1283,6 +1285,31 @@ export default function TacticalFootball() {
                POV
              </button>
           </div>
+
+          {/* Algorithm Indicator & Lab Link */}
+          <Link
+            href="/algorithm-lab"
+            className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg hover:bg-zinc-800 hover:border-zinc-700 transition-colors group"
+            title="Open Algorithm Lab to customize trajectory prediction"
+          >
+            <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-300">
+              🧪 {getActiveAlgorithmName()}
+            </span>
+            {isCustomAlgorithmActive() && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  clearCustomAlgorithm();
+                  window.location.reload();
+                }}
+                className="text-[10px] px-1.5 py-0.5 bg-red-900/50 hover:bg-red-800/70 border border-red-700 rounded text-red-300 transition-colors"
+                title="Reset to default algorithm"
+              >
+                Reset
+              </button>
+            )}
+          </Link>
 
           <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg">
               <SlidersHorizontal size={14} className="text-zinc-500" />

@@ -787,8 +787,123 @@ graph TB
 
 ---
 
+## 9. Algorithm Laboratory **(Jetbrains Challenge)**
+
+### Overview
+
+The Algorithm Lab is a dedicated interface for sports science researchers to design, test, and benchmark custom trajectory prediction algorithms. This feature enables experimentation with different physics models to determine which yields optimal game performance.
+
+### Access
+
+Navigate to `/algorithm-lab` or click the algorithm indicator (🧪) in the game controls.
+
+### Features
+
+#### 1. Custom Algorithm Editor
+- **JSON-based configuration**: Define algorithms using a structured schema
+- **Live validation**: Immediate feedback on configuration errors
+- **Sample templates**: Pre-loaded examples including enhanced friction models
+- **Built-in documentation**: Complete schema reference
+
+#### 2. Algorithm Types Supported
+
+**Custom Friction Models:**
+- **Linear**: `friction = c[0] + c[1] * velocity`
+- **Quadratic** (air resistance): `friction = c[0] + c[1] * velocity^2`
+- **Exponential**: `friction = c[0] * exp(-c[1] * velocity)`
+- **Piecewise**: Different friction for velocity ranges
+
+**Environmental Factors:**
+- Wind effects (constant X/Y velocity components)
+- Surface friction zones (define field areas with modified friction)
+- Custom bounce energy loss coefficients
+
+**Ball Physics:**
+- Mass modifications
+- Radius adjustments
+- Spin decay rates
+
+#### 3. Benchmarking System
+- Compare custom algorithms against baseline physics
+- Metrics tracked:
+  - Average prediction error (pixels)
+  - Maximum error (pixels)
+  - Computation time (milliseconds)
+  - Test cases passed
+- Visual results table with performance indicators
+
+#### 4. Game Integration
+- Algorithms automatically activate upon submission
+- Persistent storage via localStorage
+- Visual indicator in game UI showing active algorithm
+- One-click reset to default physics
+
+### Research Applications
+
+**Example Use Cases:**
+1. Test if quadratic friction (air resistance) improves prediction accuracy for high-speed shots
+2. Explore how surface friction zones affect player positioning strategies
+3. Determine optimal time step for balancing accuracy vs performance
+4. Evaluate whether environmental factors (wind) create more dynamic gameplay
+5. Find the bounce energy loss coefficient that produces most realistic physics
+
+### Sample Algorithm
+
+```json
+{
+  "name": "Enhanced Friction Model",
+  "version": "1.0.0",
+  "author": "Sports Science Lab",
+  "description": "Quadratic friction with surface zones",
+
+  "parameters": {
+    "friction": 0.92,
+    "timeStep": 0.05,
+    "maxPredictionTime": 4.0,
+    "bounceEnergyLoss": 0.75,
+    "stopThreshold": 0.3
+  },
+
+  "customFriction": {
+    "type": "quadratic",
+    "coefficients": [0.92, 0.001],
+    "description": "Air resistance increases with speed"
+  },
+
+  "environment": {
+    "windEnabled": false,
+    "surfaceFrictionZones": [{
+      "x1": 0, "y1": 0, "x2": 200, "y2": 600,
+      "frictionMultiplier": 1.1
+    }]
+  },
+
+  "metadata": {
+    "dateCreated": "2025-11-23",
+    "tags": ["realistic", "quadratic-friction"],
+    "expectedAccuracy": 92
+  }
+}
+```
+
+### Workflow
+
+1. **Design** → Edit JSON configuration in the lab
+2. **Validate** → Check for errors and view documentation
+3. **Benchmark** → Run accuracy tests vs baseline
+4. **Deploy** → Submit to activate in game
+5. **Observe** → Play matches and track scores
+6. **Iterate** → Refine based on performance data
+
+### Documentation
+
+For complete technical documentation, see [ALGORITHM_LAB.md](./ALGORITHM_LAB.md)
+
+---
+
 ## See Also
 
 - [AI Setup Guide](./AI_SETUP.md) - How to configure OpenRouter API
 - [Trajectory Prediction Code](./utils/trajectoryPredictor.ts) - Physics simulation implementation
 - [API Route](./app/api/select-strategy/route.ts) - LLM integration endpoint
+- [Algorithm Lab Documentation](./ALGORITHM_LAB.md) - Complete guide for sports science researchers
