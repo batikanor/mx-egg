@@ -9,7 +9,9 @@ import {
   Pause,
   FastForward,
   Box,
-  SquareDashedBottom
+  SquareDashedBottom,
+  Gamepad2,
+  Eye
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import StrategyPanel from './StrategyPanel';
@@ -329,6 +331,7 @@ export default function TacticalFootball() {
   const [simSpeed, setSimSpeed] = useState(0.6);
   const [isPaused, setIsPaused] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
+  const [appMode, setAppMode] = useState<'GAME' | 'POV'>('GAME');
   const [deviceConnected, setDeviceConnected] = useState(false);
   const [deviceStatus, setDeviceStatus] = useState('No device');
 
@@ -1263,6 +1266,24 @@ export default function TacticalFootball() {
 
       {/* Controls */}
       <div className="w-full max-w-3xl flex items-center justify-end gap-4 mb-2 pr-2">
+          {/* Mode Switcher */}
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg mr-auto">
+             <button
+               onClick={() => { setAppMode('GAME'); setSelectedPlayer(null); }}
+               className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${appMode === 'GAME' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+             >
+               <Gamepad2 size={14} />
+               Game
+             </button>
+             <button
+               onClick={() => setAppMode('POV')}
+               className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${appMode === 'POV' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+             >
+               <Eye size={14} />
+               POV
+             </button>
+          </div>
+
           <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg">
               <SlidersHorizontal size={14} className="text-zinc-500" />
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Speed: {simSpeed.toFixed(1)}x</span>
@@ -1315,12 +1336,15 @@ export default function TacticalFootball() {
         blueTeam={renderBlue}
         ball={renderBall}
         lockedPlayers={lockedPlayersUI}
-        onPlayerClick={setSelectedPlayer}
-        selectedPlayer={selectedPlayer}
+        onPlayerClick={(id) => {
+          if (appMode === 'GAME') return;
+          setSelectedPlayer(id);
+        }}
+        selectedPlayer={appMode === 'POV' ? selectedPlayer : null}
       />
 
       {/* Background POV Capture (visually hidden but still rendered) */}
-      {backgroundCapturePlayer && (() => {
+      {appMode === 'POV' && backgroundCapturePlayer && (() => {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === backgroundCapturePlayer);
         const isRed = backgroundCapturePlayer.startsWith('r');
@@ -1341,7 +1365,7 @@ export default function TacticalFootball() {
       })()}
 
       {/* Player First-Person POV (visible) */}
-      {selectedPlayer && (() => {
+      {appMode === 'POV' && selectedPlayer && (() => {
         const allPlayers = [...renderRed, ...renderBlue];
         const player = allPlayers.find(p => p.id === selectedPlayer);
         const isRed = selectedPlayer.startsWith('r');
