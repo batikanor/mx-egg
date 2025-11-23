@@ -39,6 +39,7 @@ export class MXCreativeConsole extends EventTarget {
         };
 
         this._handleInput = this._handleInput.bind(this);
+
     }
 
     /**

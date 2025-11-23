@@ -127,8 +127,8 @@ export function createVirtualConsole(mxInstance) {
 
     const container = document.createElement('div');
     container.innerHTML = `
-        <button id="vcToggleBtn" class="vc-toggle-btn">Show Console View</button>
-        <div id="virtualConsole" class="virtual-console hidden">
+        <button id="vcToggleBtn" class="vc-toggle-btn" style="opacity: 0; pointer-events: none;">Show Console View</button>
+        <div id="virtualConsole" class="virtual-console">
             <div class="vc-header">
                 <span>MX Creative Keypad</span>
                 <span class="vc-close" id="vcCloseBtn">×</span>
