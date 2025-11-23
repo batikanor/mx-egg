@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MX Creative Arcade</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --surface: #1e1e1e;
+            --surface-hover: #2a2a2a;
+            --accent: #00b8fc;
+            /* Logitech Blue/Cyan */
+            --text-main: #ffffff;
+            --text-sub: #a0a0a0;
+            --success: #4ade80;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding-bottom: 80px;
+            /* Space for footer */
+        }
+
+        header {
+            padding: 60px 20px 40px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0.9;
+        }
+
+        .logitech-logo {
+            height: 40px;
+            /* Slightly larger for full wordmark */
+            width: auto;
+            /* Invert to make black logo white, brightness for safety */
+            filter: invert(1) brightness(100);
+            opacity: 0.9;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -1px;
+            background: linear-gradient(90deg, #fff, #ccc);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            display: none;
+        }
+
+        /* Grid Layout */
+        .mx-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            width: 100%;
+            max-width: 720px;
+            /* Tighter max width for density */
+            padding: 0 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 20px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            aspect-ratio: 1;
+            border: 1px solid transparent;
+        }
+
+        .card:hover {
+            background: var(--surface-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .card.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        .card-icon {
+            font-size: 56px;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover .card-icon {
+            transform: scale(1.1);
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .card p {
+            margin: 6px 0 0;
+            color: var(--text-sub);
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+        }
+
+        .card:hover p {
+            opacity: 1;
+            transform: translateY(0);
+            position: static;
+            /* Allow it to flow */
+        }
+
+        /* Hide content slightly on hover to make room for text if needed, or just overlay */
+
+
+        .key-hint {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-family: 'Poppins', monospace;
+            font-weight: 500;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Virtual Console */
+        .virtual-console {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+            transform-origin: bottom right;
+        }
+
+        .virtual-console.hidden {
+            transform: scale(0.9) translateY(20px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .vc-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: #888;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vc-close {
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .vc-close:hover {
+            color: #fff;
+        }
+
+        .vc-device {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: #111;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+
+        .vc-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .vc-key {
+            width: 60px;
+            height: 60px;
+            background: #000;
+            border-radius: 8px;
+            border: 2px solid #333;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.1s;
+        }
+
+        .vc-key:active,
+        .vc-key.pressed {
+            border-color: var(--accent);
+            transform: scale(0.95);
+        }
+
+        .vc-key canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .vc-paging {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .vc-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #222;
+            border: 1px solid #333;
+            color: #888;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .vc-btn:active,
+        .vc-btn.pressed {
+            background: #333;
+            color: #fff;
+            transform: scale(0.95);
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            background: var(--text-main);
+            color: #000;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            transform: scale(1.02);
+            background: #f0f0f0;
+        }
+
+        .btn:disabled {
+            background: #333;
+            color: #888;
+            cursor: default;
+            transform: none;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 32px;
+            }
+
+            .mx-grid {
+                grid-template-columns: 1fr;
+                max-width: 400px;
+            }
+
+            .card {
+                aspect-ratio: auto;
+                padding: 30px;
+                flex-direction: row;
+                justify-content: flex-start;
+                text-align: left;
+                gap: 20px;
+            }
+
+            .card-icon {
+                font-size: 40px;
+                margin: 0;
+            }
+
+            .card p {
+                opacity: 1;
+                position: static;
+                transform: none;
+                margin-top: 4px;
+            }
+
+            .card-content {
+                flex: 1;
+            }
+
+            .key-hint {
+                top: 50%;
+                transform: translateY(-50%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo-container">
+            <!-- Full Logitech Wordmark -->
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Logitech_logo.svg/2560px-Logitech_logo.svg.png"
+                alt="Logitech" class="logitech-logo">
+        </div>
+        <h1>MX Creative Arcade</h1>
+        <!-- Subtitle removed -->
+    </header>
+
+    <div class="grid mx-grid" id="grid-container">
+        <!-- Dynamic content -->
+    </div>
+
+    <div class="status-bar">
+        <button id="connectBtn" class="btn">Connect Console</button>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from './packages/mx-creative-console.js';
+        import { createVirtualConsole } from './packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+
+        const connectBtn = document.getElementById('connectBtn');
+
+        const games = [
+            { url: 'games/tictactoe.html', icon: '❌', color: '#ff6b6b', title: 'Tic Tac Toe', desc: 'Classic strategy' },
+            { url: 'games/minesweeper.html', icon: '💣', color: '#f59e0b', title: 'Bomb Finder', desc: 'Avoid the mines' },
+            { url: 'games/pong.html', icon: '🏓', color: '#60a5fa', title: 'MX Pong', desc: 'Arcade action' },
+            { url: 'games/racing.html', icon: '🏎️', color: '#f43f5e', title: 'Neon Racer', desc: 'High speed driving' },
+            { url: 'games/dance.html', icon: '💃', color: '#e879f9', title: 'MX Dance', desc: 'Rhythm & beat' },
+            { url: 'https://football-2d-chi.vercel.app/', icon: '⚽', color: '#10b981', title: 'Football Manager', desc: 'Tactical sim' },
+            { url: 'games/whack.html', icon: '👺', color: '#facc15', title: 'Whack-a-Sprite', desc: 'Test your reaction' },
+            { url: 'games/memory.html', icon: '🧠', color: '#8b5cf6', title: 'Memory Matrix', desc: 'Match pairs' },
+            { url: 'games/rogue.html', icon: '🧙‍♂️', color: '#a855f7', title: 'Keypad Rogue', desc: 'Dungeon crawler' },
+            { url: 'games/timing.html', icon: '⏱️', color: '#10b981', title: 'Precision Timer', desc: 'Timing challenge' },
+            { url: 'games/doom.html', icon: '👹', color: '#b91c1c', title: 'MX DOOM', desc: '3D Raycaster' },
+            {
+                url: 'games/simon.html',
+                icon: '<svg viewBox="0 0 100 100" style="width:1em;height:1em;overflow:visible"><path d="M50 50 L2 50 A48 48 0 0 1 50 2 Z" fill="#4ade80"/><path d="M50 50 L50 2 A48 48 0 0 1 98 50 Z" fill="#f87171"/><path d="M50 50 L98 50 A48 48 0 0 1 50 98 Z" fill="#60a5fa"/><path d="M50 50 L50 98 A48 48 0 0 1 2 50 Z" fill="#facc15"/></svg>',
+                color: '#eab308',
+                title: 'MX Simon',
+                desc: 'Pattern Memory'
+            },
+            { url: 'games/video.html', icon: 'resources/badapple.png', color: '#ec4899', title: 'Video Player', desc: 'Watch local video' }
+        ];
+
+        let currentPage = 0;
+        const pageSize = 9;
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                await mx.connect();
+            } catch (e) { console.error(e); }
+        });
+
+        // Try auto-connect
+        mx.reconnect();
+
+        // Render initial static grid
+        renderFullGrid();
+        // Render initial virtual console (even if not connected)
+        renderMenu();
+
+        mx.addEventListener('connected', () => {
+            connectBtn.textContent = "Connected";
+            connectBtn.disabled = true;
+            renderMenu();
+            updateActivePageIndicator();
+        });
+
+        mx.addEventListener('keydown', (e) => {
+            const k = e.detail.key;
+            const totalPages = Math.ceil(games.length / pageSize);
+
+            // Navigation - Page Left (9) / Page Right (10)
+            if (k === 9) {
+                if (currentPage > 0) {
+                    currentPage--;
+                    renderMenu();
+                    updateActivePageIndicator();
+                }
+                return;
+            }
+
+            if (k === 10) {
+                if (currentPage < totalPages - 1) {
+                    currentPage++;
+                    renderMenu();
+                    updateActivePageIndicator();
+                }
+                return;
+            }
+
+            // Game selection (0-8)
+            if (k >= 0 && k < 9) {
+                const gameIndex = currentPage * pageSize + k;
+                if (gameIndex < games.length) {
+                    const card = document.getElementById(`game${gameIndex + 1}`);
+                    if (card) {
+                        card.classList.add('active');
+                        localStorage.setItem('lastGame', games[gameIndex].url);
+                        setTimeout(() => {
+                            window.location.href = games[gameIndex].url;
+                        }, 200);
+                    }
+                }
+            }
+        });
+
+        function renderFullGrid() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = games.map((game, i) => {
+                const isImg = game.icon.endsWith('.png');
+                const iconContent = isImg
+                    ? `<img src="${game.icon}" style="width: 1em; height: 1em; object-fit: contain;">`
+                    : game.icon;
+                return `
+                <a href="${game.url}" class="card" id="game${i + 1}">
+                    <div class="key-hint" id="hint${i + 1}"></div>
+                    <div class="card-icon">${iconContent}</div>
+                    <div class="card-content">
+                        <h2>${game.title}</h2>
+                        <p>${game.desc}</p>
+                    </div>
+                </a>
+            `}).join('');
+
+            updateActivePageIndicator();
+        }
+
+        function updateActivePageIndicator() {
+            // Show key hints only for current page
+            // Also maybe highlight the active "page" of cards?
+            // For simplicity, we just update the Key Hints (1-9) on the cards
+            // that correspond to the currently active device page.
+
+            games.forEach((_, i) => {
+                const hintEl = document.getElementById(`hint${i + 1}`);
+                const cardEl = document.getElementById(`game${i + 1}`);
+
+                // Calculate which page this game belongs to
+                const pageIndex = Math.floor(i / pageSize);
+
+                if (pageIndex === currentPage) {
+                    // Active page: show number 1-9
+                    const localIndex = i % pageSize;
+                    hintEl.textContent = (localIndex + 1).toString();
+                    hintEl.style.display = 'flex';
+                    cardEl.style.opacity = '1';
+                } else {
+                    // Inactive page: hide number
+                    hintEl.style.display = 'none';
+                    cardEl.style.opacity = '0.5'; // Dim others to indicate they aren't active on keypad
+                }
+            });
+        }
+
+        function updateGrid() {
+            // No-op now, we keep all games visible but dim them
+        }
+
+        async function renderMenu() {
+            // Render even if device is not connected, so VC updates
+            // if (!mx || !mx.device) return;
+
+            // If we have pages, maybe indicate that? 
+            // The paging buttons (physical) are separate from the LCDs.
+
+            const tasks = [];
+            for (let i = 0; i < 9; i++) {
+                const gameIndex = currentPage * pageSize + i;
+                if (gameIndex < games.length) {
+                    tasks.push(renderIcon(i, games[gameIndex]));
+                } else {
+                    tasks.push(renderBlank(i));
+                }
+            }
+            await Promise.all(tasks);
+        }
+
+        async function renderIcon(index, game) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Modern clean icon style for device
+            ctx.fillStyle = '#1e1e1e'; // Match surface
+            ctx.fillRect(0, 0, size, size);
+
+            // Border
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, size, size); // Full bleed? No, keep inner
+
+            // Inner Accent Border
+            ctx.strokeStyle = game.color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(4, 4, size - 8, size - 8);
+
+            if (game.title === 'MX Simon') {
+                // Special 4-color Simon Icon rendering for Canvas
+                const r = 25;
+                const cx = size / 2;
+                const cy = size / 2;
+
+                // Top Left - Green
+                ctx.fillStyle = '#4ade80';
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, Math.PI, 1.5 * Math.PI); ctx.fill();
+
+                // Top Right - Red
+                ctx.fillStyle = '#f87171';
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, 1.5 * Math.PI, 0); ctx.fill();
+
+                // Bottom Right - Blue
+                ctx.fillStyle = '#60a5fa';
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, 0, 0.5 * Math.PI); ctx.fill();
+
+                // Bottom Left - Yellow
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, 0.5 * Math.PI, Math.PI); ctx.fill();
+            } else if (game.icon.endsWith('.png')) {
+                const img = new Image();
+                img.src = game.icon;
+                await new Promise(r => { img.onload = r; img.onerror = r; });
+                const iconSize = 80;
+                ctx.drawImage(img, (size - iconSize) / 2, (size - iconSize) / 2, iconSize, iconSize);
+            } else {
+                // Icon
+                ctx.font = '50px Poppins, Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(game.icon, size / 2, size / 2);
+            }
+
+            return sendToDevice(index, canvas);
+        }
+
+        async function renderBlank(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, size, size);
+            return sendToDevice(index, canvas);
+        }
+
+        function sendToDevice(index, canvas) {
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx) {
+                        try { await mx.setKeyImage(index, blob); } catch (e) { }
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+    </script>
+</body>
+
+</html>

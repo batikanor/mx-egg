@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MX Simon</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --text-main: #ffffff;
+            --muted: #a0a0a0;
+            
+            --red: #ef4444;
+            --green: #22c55e;
+            --blue: #3b82f6;
+            --yellow: #eab308;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 { font-size: 3rem; margin: 0; margin-bottom: 1rem; }
+        .status { font-size: 1.5rem; color: var(--muted); margin-bottom: 2rem; height: 2rem; }
+        
+        .score-container {
+            font-size: 4rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .label { font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 0.5rem; }
+
+        #connectBtn {
+            background: var(--text-main);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            position: absolute;
+            bottom: 40px;
+        }
+        #connectBtn:disabled { opacity: 0.5; cursor: default; }
+
+        /* Visual representation of the pad */
+        .simon-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            gap: 10px;
+            margin-top: 40px;
+            opacity: 0.5;
+        }
+        .simon-key {
+            width: 80px; height: 80px;
+            border-radius: 12px;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.1s;
+        }
+        
+        .key-red { border: 2px solid var(--red); color: var(--red); }
+        .key-green { border: 2px solid var(--green); color: var(--green); }
+        .key-blue { border: 2px solid var(--blue); color: var(--blue); }
+        .key-yellow { border: 2px solid var(--yellow); color: var(--yellow); }
+        
+        .simon-key.active {
+            transform: scale(0.95);
+            box-shadow: 0 0 20px currentColor;
+            background: currentColor;
+            color: #000;
+        }
+
+    </style>
+</head>
+<body>
+    <h1>MX SIMON</h1>
+    <div class="label">Current Score</div>
+    <div class="score-container" id="score">0</div>
+    <div class="status" id="status">Waiting to connect...</div>
+
+    <div class="simon-grid" id="simonGrid">
+        <div class="simon-key"></div>
+        <div class="simon-key key-red" id="key2">2</div>
+        <div class="simon-key"></div>
+        
+        <div class="simon-key key-green" id="key4">4</div>
+        <div class="simon-key" id="key5">START</div>
+        <div class="simon-key key-blue" id="key6">6</div>
+        
+        <div class="simon-key"></div>
+        <div class="simon-key key-yellow" id="key8">8</div>
+        <div class="simon-key"></div>
+    </div>
+
+    <button id="connectBtn">Connect Console</button>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        const connectBtn = document.getElementById('connectBtn');
+        const statusEl = document.getElementById('status');
+        const scoreEl = document.getElementById('score');
+        const gridEl = document.getElementById('simonGrid');
+
+        // Game State
+        let sequence = [];
+        let playerIndex = 0;
+        let state = 'idle'; // idle, playing_sequence, input, game_over
+        let score = 0;
+
+        // Mapping: Index -> Color/Tone
+        // 1 (Key 2) -> Red
+        // 3 (Key 4) -> Green
+        // 5 (Key 6) -> Blue
+        // 7 (Key 8) -> Yellow
+        const KEYS = {
+            1: { color: '#ef4444', name: 'red', id: 'key2' },    // Top
+            3: { color: '#22c55e', name: 'green', id: 'key4' },  // Left
+            5: { color: '#3b82f6', name: 'blue', id: 'key6' },   // Right
+            7: { color: '#eab308', name: 'yellow', id: 'key8' }  // Bottom
+        };
+        const VALID_KEYS = [1, 3, 5, 7];
+
+        // --- Connection ---
+        connectBtn.addEventListener('click', async () => {
+            try { await mx.connect(); } catch (e) { console.error(e); }
+        });
+
+        mx.reconnect();
+
+        mx.addEventListener('connected', () => {
+            connectBtn.textContent = "Connected";
+            connectBtn.disabled = true;
+            statusEl.textContent = "Press CENTER to Start";
+            gridEl.style.opacity = 1;
+            renderIdle();
+        });
+
+        // --- Input ---
+        mx.addEventListener('keydown', (e) => {
+            const k = e.detail.key;
+
+            // Quit
+            if (k === 9) { // Page Left
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            if (state === 'idle' || state === 'game_over') {
+                if (k === 4) startGame(); // Center key
+                return;
+            }
+
+            if (state === 'input') {
+                handleInput(k);
+            }
+        });
+
+        mx.addEventListener('keyup', (e) => {
+            const k = e.detail.key;
+            // Visual feedback off
+            if (KEYS[k]) {
+                visualizeKey(k, false);
+                renderKey(k, false); // Turn off light on device
+            }
+        });
+
+        // --- Game Logic ---
+
+        async function startGame() {
+            sequence = [];
+            score = 0;
+            scoreEl.textContent = score;
+            await resetBoardVisuals();
+            renderCenterIcon(4, score.toString());
+            nextRound();
+        }
+
+        function nextRound() {
+            state = 'playing_sequence';
+            statusEl.textContent = "Watch...";
+            
+            // Add random step
+            const nextKey = VALID_KEYS[Math.floor(Math.random() * VALID_KEYS.length)];
+            sequence.push(nextKey);
+            
+            playerIndex = 0;
+            scoreEl.textContent = score;
+            
+            // Play sequence
+            playSequence();
+        }
+
+        async function playSequence() {
+            // Update Center to show score/round
+            renderCenterIcon(4, score.toString());
+            
+            // Wait a bit before starting
+            await sleep(500);
+            
+            for (const k of sequence) {
+                // Light up
+                visualizeKey(k, true);
+                renderKey(k, true);
+                await sleep(400); // Light duration
+                
+                // Light off
+                visualizeKey(k, false);
+                renderKey(k, false);
+                await sleep(200); // Gap
+            }
+            
+            state = 'input';
+            statusEl.textContent = "Your Turn!";
+        }
+
+        async function handleInput(k) {
+            if (!VALID_KEYS.includes(k)) return;
+
+            // Visual feedback immediately
+            visualizeKey(k, true);
+            renderKey(k, true);
+            
+            // Check correctness
+            const expected = sequence[playerIndex];
+            
+            if (k === expected) {
+                // Correct
+                playerIndex++;
+                if (playerIndex >= sequence.length) {
+                    // Round complete
+                    state = 'round_complete';
+                    score++;
+                    statusEl.textContent = "Good!";
+                    await sleep(500); // Wait for last key release visual usually handled by keyup, but let's pause logic
+                    nextRound();
+                }
+            } else {
+                // Wrong
+                gameOver();
+            }
+        }
+
+        async function gameOver() {
+            state = 'game_over';
+            statusEl.textContent = "GAME OVER";
+            
+            // Flash all red
+            for (let i = 0; i < 3; i++) {
+                if (state !== 'game_over') return;
+                await renderFill('#ff0000');
+                await sleep(200);
+                
+                if (state !== 'game_over') return;
+                // Show skull
+                await renderCenterIcon(4, '☠️'); 
+                // And colors
+                for (const k of VALID_KEYS) await renderKey(k, false);
+                await sleep(200);
+            }
+            
+            if (state !== 'game_over') return;
+            statusEl.textContent = "Press CENTER to Restart";
+            // Ensure center shows restart prompt or skull
+            renderCenterIcon(4, '☠️');
+        }
+
+        function visualizeKey(k, active) {
+            const def = KEYS[k];
+            if (!def) return;
+            const el = document.getElementById(def.id);
+            if (el) {
+                if (active) el.classList.add('active');
+                else el.classList.remove('active');
+            }
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // --- Device Rendering ---
+
+        async function resetBoardVisuals() {
+            if (!mx || !mx.device) return;
+            
+            const tasks = [];
+            // Render Color Keys (Dimmed)
+            for (const k of VALID_KEYS) {
+                tasks.push(renderKey(k, false));
+            }
+            
+            // Blank others
+            const others = [0, 2, 6, 8]; 
+            for (const k of others) {
+                tasks.push(renderBlank(k));
+            }
+            
+            await Promise.all(tasks);
+        }
+
+        async function renderIdle() {
+            if (!mx || !mx.device) return;
+            
+            await resetBoardVisuals();
+            
+            // Render Center (Start) - Or Score if game over
+            if (state === 'game_over') {
+                await renderCenterIcon(4, '☠️');
+            } else {
+                await renderCenterIcon(4, '▶');
+            }
+        }
+        
+        async function renderFill(color) {
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for (let i=0; i<9; i++) {
+                tasks.push(renderColor(i, color));
+            }
+            await Promise.all(tasks);
+        }
+
+        async function renderKey(index, active) {
+            // Render a colored square or circle
+            if (!mx || !mx.device) return;
+            
+            const def = KEYS[index];
+            if (!def) return;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 118;
+            canvas.height = 118;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 118, 118);
+            
+            // Border
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, 118, 118);
+            
+            // Color Blob
+            ctx.fillStyle = def.color;
+            const size = active ? 100 : 60;
+            const alpha = active ? 1.0 : 0.3;
+            
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.arc(59, 59, size/2, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Glow if active
+            if (active) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            }
+            
+            return sendToDevice(index, canvas);
+        }
+        
+        async function renderCenterIcon(index, icon) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 118;
+            canvas.height = 118;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 118, 118);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '60px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(icon, 59, 59);
+            
+            return sendToDevice(index, canvas);
+        }
+        
+        async function renderBlank(index) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 118;
+            canvas.height = 118;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 118, 118);
+            return sendToDevice(index, canvas);
+        }
+        
+        async function renderColor(index, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 118;
+            canvas.height = 118;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, 118, 118);
+            return sendToDevice(index, canvas);
+        }
+
+        function sendToDevice(index, canvas) {
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx) {
+                        try { await mx.setKeyImage(index, blob); } catch (e) { }
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.8);
+            });
+        }
+
+    </script>
+</body>
+</html>
+

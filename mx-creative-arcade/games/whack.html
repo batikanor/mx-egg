@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Whack-a-Sprite — MX Creative Console</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --accent: #00b8fc;
+            --text: #ffffff;
+        }
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            background: var(--panel);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 360px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        h1 { margin: 0 0 16px; color: #fff; font-size: 28px; font-weight: 700; }
+        
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: monospace;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 16px;
+            border-radius: 8px;
+        }
+        .score { color: #4ade80; }
+        .time { color: #facc15; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .cell {
+            width: 100px;
+            height: 100px;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            user-select: none;
+        }
+        .cell:active { transform: scale(0.95); }
+        
+        .goblin { background: rgba(74, 222, 128, 0.2); border-color: #4ade80; }
+        .bomb { background: rgba(248, 113, 113, 0.2); border-color: #f87171; }
+        .coin { background: rgba(250, 204, 21, 0.2); border-color: #facc15; }
+
+        .btn {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: scale(1.05); }
+        .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Whack-a-Sprite</h1>
+        
+        <div class="stats">
+            <div class="score">PTS: <span id="scoreVal">0</span></div>
+            <div class="time">TIME: <span id="timeVal">30</span></div>
+        </div>
+
+        <div class="grid" id="grid">
+            <!-- Cells 0-8 -->
+            <div class="cell" data-i="0"></div>
+            <div class="cell" data-i="1"></div>
+            <div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div>
+            <div class="cell" data-i="4"></div>
+            <div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div>
+            <div class="cell" data-i="7"></div>
+            <div class="cell" data-i="8"></div>
+        </div>
+
+        <button id="connectBtn" class="btn">Connect Device</button>
+        <button id="startBtn" class="btn" style="background:#4ade80; color:#000; display:none">Start Game</button>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        const gridEl = document.getElementById('grid');
+        const cells = Array.from(document.querySelectorAll('.cell'));
+        const scoreEl = document.getElementById('scoreVal');
+        const timeEl = document.getElementById('timeVal');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+
+        // Game Config
+        const GAME_DURATION = 30;
+        const SPAWN_RATE_MIN = 400;
+        const SPAWN_RATE_MAX = 800;
+        
+        // Types
+        const TYPES = {
+            NONE: 0,
+            GOBLIN: 1, // +1
+            BOMB: 2,   // -5
+            COIN: 3    // +5
+        };
+
+        // State
+        let score = 0;
+        let timeLeft = GAME_DURATION;
+        let isPlaying = false;
+        let gridState = new Array(9).fill(null); // null or {type, despawnTime}
+        let gameLoopId;
+        let deviceConnected = false;
+
+        // --- UI Events ---
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                if (await mx.connect()) {
+                    deviceConnected = true;
+                    connectBtn.style.display = 'none';
+                    renderAllKeys();
+                    startGame();
+                }
+            } catch(e) { alert(e); }
+        });
+
+        // Try auto-connect
+        (async () => {
+            if(await mx.reconnect()) {
+                deviceConnected = true;
+                connectBtn.style.display = 'none';
+                renderAllKeys();
+                startGame();
+            }
+        })();
+
+        // Allow keyboard/click play without device for testing
+        setTimeout(() => {
+            if(!deviceConnected && startBtn.style.display === 'none') {
+                startBtn.style.display = 'inline-block';
+                startBtn.textContent = "Play (No Device)";
+            }
+        }, 1000);
+
+        startBtn.addEventListener('click', startGame);
+
+        gridEl.addEventListener('mousedown', e => {
+            const cell = e.target.closest('.cell');
+            if(cell) whack(parseInt(cell.dataset.i));
+        });
+
+        // Keyboard 1-9
+        window.addEventListener('keydown', e => {
+            if(!isPlaying) return;
+            const k = parseInt(e.key);
+            if(k >= 1 && k <= 9) whack(k-1);
+        });
+
+        // MX Input
+        mx.addEventListener('keydown', e => {
+            const k = e.detail.key;
+            
+            // Navigation: Left Button -> Hub
+            if (k === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            if(isPlaying) whack(k);
+        });
+
+        // --- Game Logic ---
+
+        function startGame() {
+            if(isPlaying) return;
+            isPlaying = true;
+            score = 0;
+            timeLeft = GAME_DURATION;
+            gridState = new Array(9).fill(null);
+            
+            updateUI();
+            startBtn.style.display = 'none';
+            startBtn.disabled = true;
+            
+            let lastTime = performance.now();
+            let spawnTimer = 0;
+
+            gameLoopId = requestAnimationFrame(function loop(now) {
+                if(!isPlaying) return;
+                const dt = now - lastTime;
+                lastTime = now;
+
+                // Timer
+                timeLeft -= dt / 1000;
+                if (timeLeft <= 0) {
+                    endGame();
+                    return;
+                }
+
+                // Spawning
+                spawnTimer -= dt;
+                if (spawnTimer <= 0) {
+                    spawnEntity();
+                    spawnTimer = Math.random() * (SPAWN_RATE_MAX - SPAWN_RATE_MIN) + SPAWN_RATE_MIN;
+                    // Speed up slightly as time goes on
+                    spawnTimer *= Math.max(0.5, timeLeft / GAME_DURATION);
+                }
+
+                // Despawning
+                const currentTime = Date.now();
+                let changed = false;
+                for(let i=0; i<9; i++) {
+                    if(gridState[i] && currentTime > gridState[i].despawnTime) {
+                        gridState[i] = null;
+                        changed = true;
+                    }
+                }
+
+                updateUI(changed); // Only render keys if changed
+                requestAnimationFrame(loop);
+            });
+        }
+
+        function spawnEntity() {
+            // Find empty slots
+            const empty = gridState.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
+            if(empty.length === 0) return;
+
+            const idx = empty[Math.floor(Math.random() * empty.length)];
+            
+            // Decide Type
+            const rand = Math.random();
+            let type = TYPES.GOBLIN;
+            let duration = 1000; // ms to stay alive
+
+            if (rand > 0.85) {
+                type = TYPES.COIN; // Rare
+                duration = 600; // Fast!
+            } else if (rand > 0.65) {
+                type = TYPES.BOMB; // Trap
+                duration = 2000; // Stays longer to block you
+            } else {
+                type = TYPES.GOBLIN;
+                duration = 1200;
+            }
+
+            // Speed up late game
+            const factor = Math.max(0.6, timeLeft / GAME_DURATION);
+            duration *= factor;
+
+            gridState[idx] = {
+                type: type,
+                despawnTime: Date.now() + duration
+            };
+            
+            updateUI(true); // Force render
+        }
+
+        function whack(idx) {
+            if (!gridState[idx]) return;
+
+            const item = gridState[idx];
+            gridState[idx] = null; // Clear immediately
+
+            if (item.type === TYPES.GOBLIN) {
+                score += 1;
+                flashKey(idx, '#4ade80');
+            } else if (item.type === TYPES.COIN) {
+                score += 5;
+                flashKey(idx, '#facc15');
+            } else if (item.type === TYPES.BOMB) {
+                score -= 5;
+                flashKey(idx, '#f87171');
+            }
+            
+            updateUI(true);
+        }
+
+        function endGame() {
+            isPlaying = false;
+            timeLeft = 0;
+            gridState = new Array(9).fill(null);
+            updateUI(true);
+            startBtn.style.display = 'inline-block';
+            startBtn.disabled = false;
+            startBtn.textContent = `Game Over! Score: ${score}. Play Again?`;
+        }
+
+        // --- Rendering ---
+
+        function updateUI(renderKeys = false) {
+            scoreEl.textContent = score;
+            timeEl.textContent = Math.ceil(timeLeft);
+
+            // Browser Grid
+            cells.forEach((cell, i) => {
+                cell.className = 'cell';
+                cell.textContent = '';
+                const item = gridState[i];
+                if (item) {
+                    if (item.type === TYPES.GOBLIN) {
+                        cell.classList.add('goblin');
+                        cell.textContent = '👺';
+                    } else if (item.type === TYPES.BOMB) {
+                        cell.classList.add('bomb');
+                        cell.textContent = '💣';
+                    } else if (item.type === TYPES.COIN) {
+                        cell.classList.add('coin');
+                        cell.textContent = '💰';
+                    }
+                }
+            });
+
+            if(renderKeys && deviceConnected) {
+                renderAllKeys();
+            }
+        }
+
+        // Device Rendering
+        
+        const flashState = {}; // idx -> {color, end}
+
+        function flashKey(idx, color) {
+            flashState[idx] = { color, end: Date.now() + 150 };
+            renderKeyImage(idx); // Immediate update
+            setTimeout(() => renderKeyImage(idx), 160); // Clear after
+        }
+
+        async function renderAllKeys() {
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for(let i=0; i<9; i++) tasks.push(renderKeyImage(i));
+            await Promise.all(tasks);
+        }
+
+        async function renderKeyImage(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Check flash
+            const flash = flashState[index];
+            const isFlashing = flash && flash.end > Date.now();
+
+            if (isFlashing) {
+                ctx.fillStyle = flash.color;
+                ctx.fillRect(0,0,size,size);
+            } else {
+                const item = gridState[index];
+                
+                // Bg
+                ctx.fillStyle = '#111111'; // Dark bg
+                ctx.fillRect(0,0,size,size);
+                
+                // Border
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(4,4,size-8,size-8);
+
+                if (item) {
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = '60px Arial';
+                    
+                    if (item.type === TYPES.GOBLIN) {
+                        ctx.fillStyle = 'rgba(74, 222, 128, 0.1)';
+                        ctx.fillRect(4,4,size-8,size-8);
+                        ctx.fillStyle = '#4ade80'; // Green
+                        ctx.fillText('👺', size/2, size/2);
+                    } else if (item.type === TYPES.BOMB) {
+                        ctx.fillStyle = 'rgba(248, 113, 113, 0.1)';
+                        ctx.fillRect(4,4,size-8,size-8);
+                        ctx.fillStyle = '#f87171'; // Red
+                        ctx.fillText('💣', size/2, size/2);
+                    } else if (item.type === TYPES.COIN) {
+                        ctx.fillStyle = 'rgba(250, 204, 21, 0.1)';
+                        ctx.fillRect(4,4,size-8,size-8);
+                        ctx.fillStyle = '#facc15'; // Yellow
+                        ctx.fillText('💰', size/2, size/2);
+                    }
+                }
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx && typeof mx.setKeyImage === 'function') {
+                        try { await mx.setKeyImage(index, blob); } catch (e) {}
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+    </script>
+</body>
+</html>

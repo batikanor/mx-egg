@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Memory Matrix — MX Creative Console</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #111111;
+            --panel: #1e1e1e;
+            --accent: #8b5cf6;
+            --text: #ffffff;
+            --card-back: #334155;
+        }
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            background: var(--panel);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 400px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        h1 { margin: 0 0 10px; font-size: 28px; color: var(--accent); font-weight: 700; }
+        p { color: #94a3b8; margin-bottom: 20px; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .cell {
+            width: 110px;
+            height: 110px;
+            background: var(--card-back);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            cursor: pointer;
+            transition: transform 0.3s, background 0.3s;
+            user-select: none;
+        }
+        
+        .cell:hover { transform: scale(1.02); background: #475569; }
+        .cell.revealed { background: #0f1720; border-color: var(--accent); transform: rotateY(180deg); }
+        .cell.matched { border-color: #4ade80; opacity: 0.5; cursor: default; }
+        
+        /* Fix text flip */
+        .cell.revealed span { transform: rotateY(180deg); display: inline-block; }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; transform: scale(1.05); }
+        .btn:disabled { opacity: 0.5; cursor: default; }
+        
+        .status-text {
+            font-size: 18px; 
+            font-weight: 600; 
+            height: 24px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Memory Matrix</h1>
+        <p>Find the matching pairs!</p>
+        
+        <div class="status-text" id="statusEl">Connecting...</div>
+
+        <div class="grid" id="grid">
+            <!-- 9 Cells -->
+            <div class="cell" data-i="0"></div>
+            <div class="cell" data-i="1"></div>
+            <div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div>
+            <div class="cell" data-i="4"></div>
+            <div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div>
+            <div class="cell" data-i="7"></div>
+            <div class="cell" data-i="8"></div>
+        </div>
+
+        <button id="connectBtn" class="btn">Connect Device</button>
+        <button id="restartBtn" class="btn" style="display:none; background: #4ade80; color:#000">Play Again</button>
+    </div>
+
+    <script type="module">
+        import { MXCreativeConsole } from '../packages/mx-creative-console.js';
+        import { createVirtualConsole } from '../packages/virtual-console.js';
+
+        const mx = new MXCreativeConsole();
+        createVirtualConsole(mx);
+        const gridEl = document.getElementById('grid');
+        const cells = Array.from(document.querySelectorAll('.cell'));
+        const statusEl = document.getElementById('statusEl');
+        const connectBtn = document.getElementById('connectBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Game Config
+        const ICONS = ['🍎', '🍌', '🍇', '🍊', '🍒', '🍓', '🍉', '🥝'];
+        
+        // State
+        let deck = []; // Array of 9 items
+        let revealed = []; // Indices of currently flipped cards
+        let matched = []; // Indices of matched cards
+        let isLocked = false; // Prevent input during animation
+        let deviceConnected = false;
+
+        // --- Input ---
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                if (await mx.connect()) {
+                    onConnected();
+                }
+            } catch(e) { alert(e); }
+        });
+
+        // Auto connect
+        (async () => {
+            if(await mx.reconnect()) {
+                onConnected();
+            } else {
+                statusEl.textContent = "Connect device to play";
+            }
+        })();
+
+        function onConnected() {
+            deviceConnected = true;
+            connectBtn.style.display = 'none';
+            startNewGame();
+        }
+
+        // Allow mouse play
+        gridEl.addEventListener('click', e => {
+            const cell = e.target.closest('.cell');
+            if(cell) handleInput(parseInt(cell.dataset.i));
+        });
+
+        // Allow keyboard play (1-9)
+        window.addEventListener('keydown', e => {
+            const k = parseInt(e.key);
+            if(k >= 1 && k <= 9) handleInput(k-1);
+            
+            if(e.key.toLowerCase() === 'r') startNewGame();
+        });
+
+        // MX Input
+        mx.addEventListener('keydown', e => {
+            const k = e.detail.key;
+            
+            // Navigation
+            if (k === 9) {
+                localStorage.setItem('lastGame', window.location.href);
+                window.location.href = '../hub.html';
+                return;
+            }
+
+            handleInput(k);
+        });
+
+        restartBtn.addEventListener('click', startNewGame);
+
+        // --- Game Logic ---
+
+        function startNewGame() {
+            // Setup Deck: 4 pairs + 1 distractor (center)
+            const gameIcons = [...ICONS].sort(() => Math.random() - 0.5).slice(0, 4);
+            const pairs = [...gameIcons, ...gameIcons]; // 8 cards
+            
+            // Shuffle pairs
+            pairs.sort(() => Math.random() - 0.5);
+            
+            deck = new Array(9).fill(null);
+            let pIdx = 0;
+            for(let i=0; i<9; i++) {
+                if (i === 4) {
+                    deck[i] = { icon: '❓', type: 'distractor' }; // Center
+                } else {
+                    deck[i] = { icon: pairs[pIdx++], type: 'pair' };
+                }
+            }
+
+            revealed = [];
+            matched = [];
+            isLocked = false;
+            restartBtn.style.display = 'none';
+            statusEl.textContent = "Find the pairs!";
+            
+            updateUI();
+        }
+
+        async function handleInput(idx) {
+            if (isLocked) return;
+            if (idx < 0 || idx > 8) return;
+            if (matched.includes(idx)) return; // Already matched
+            if (revealed.includes(idx)) return; // Already flipped
+            
+            // Flip
+            revealed.push(idx);
+            updateUI();
+
+            // Check Logic
+            if (revealed.length === 2) {
+                isLocked = true;
+                const [a, b] = revealed;
+                const cardA = deck[a];
+                const cardB = deck[b];
+
+                if (cardA.type === 'pair' && cardB.type === 'pair' && cardA.icon === cardB.icon) {
+                    // Match!
+                    statusEl.textContent = "Match!";
+                    await sleep(500);
+                    matched.push(a, b);
+                    revealed = [];
+                    
+                    // Check Win
+                    if (matched.length === 8) {
+                        statusEl.textContent = "You Win! 🎉";
+                        restartBtn.style.display = 'inline-block';
+                        
+                        // Animate Win on device
+                        animateWin();
+                    }
+                } else {
+                    // Miss
+                    statusEl.textContent = "Try again...";
+                    await sleep(1000);
+                    revealed = [];
+                    statusEl.textContent = "Find the pairs!";
+                }
+                isLocked = false;
+                updateUI();
+            }
+        }
+
+        // --- Rendering ---
+
+        function updateUI() {
+            cells.forEach((cell, i) => {
+                const card = deck[i];
+                const isRevealed = revealed.includes(i) || matched.includes(i);
+                
+                cell.className = 'cell'; // reset
+                cell.innerHTML = '';
+
+                if (isRevealed) {
+                    cell.classList.add('revealed');
+                    if (matched.includes(i)) cell.classList.add('matched');
+                    
+                    const span = document.createElement('span');
+                    span.textContent = card ? card.icon : '';
+                    cell.appendChild(span);
+                } else {
+                    // Back of card
+                    cell.textContent = ''; 
+                }
+            });
+
+            if(deviceConnected) renderAllKeys();
+        }
+
+        async function renderKeyImage(index) {
+            const size = 118;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            const card = deck[index];
+            const isRevealed = revealed.includes(index) || matched.includes(index);
+            const isMatched = matched.includes(index);
+
+            // Bg
+            if (isMatched) ctx.fillStyle = '#111111';
+            else if (isRevealed) ctx.fillStyle = '#1e293b'; 
+            else ctx.fillStyle = '#334155'; // Card Back color
+
+            ctx.fillRect(0,0,size,size);
+
+            // Border
+            ctx.lineWidth = 4;
+            if (isMatched) ctx.strokeStyle = '#4ade80';
+            else if (isRevealed) ctx.strokeStyle = '#8b5cf6';
+            else ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            
+            ctx.strokeRect(4,4,size-8,size-8);
+
+            // Content
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (isRevealed && card) {
+                ctx.font = '60px Arial';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(card.icon, size/2, size/2);
+            } else {
+                // Pattern for card back
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.font = '40px Arial';
+                ctx.fillText('?', size/2, size/2);
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(async (blob) => {
+                    if (blob && mx) {
+                        try { await mx.setKeyImage(index, blob); } catch (e) {}
+                    }
+                    resolve();
+                }, 'image/jpeg', 0.9);
+            });
+        }
+
+        async function renderAllKeys() {
+            if (!mx || !mx.device) return;
+            const tasks = [];
+            for(let i=0; i<9; i++) tasks.push(renderKeyImage(i));
+            await Promise.all(tasks);
+        }
+        
+        async function animateWin() {
+             if (!mx || !mx.device) return;
+             // Rainbow wave?
+             const colors = ['#ff6b6b', '#facc15', '#4ade80', '#60a5fa', '#8b5cf6'];
+             for(let f=0; f<10; f++) {
+                 for(let i=0; i<9; i++) {
+                     // Quick matched pulse
+                 }
+                 await sleep(100);
+             }
+             renderAllKeys();
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r,ms)); }
+
+    </script>
+</body>
+</html>
